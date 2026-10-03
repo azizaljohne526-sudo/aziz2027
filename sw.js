@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aziz2027-offline-v3';
+const CACHE_NAME = 'aziz2027-offline-v4';
 
 const FILES_TO_CACHE = [
   './aziz2027.html',
@@ -38,22 +38,50 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, copy);
-        });
-        return response;
-      })
-      .catch(() =>
-        caches.match(event.request).then(cached => {
-          if (cached) return cached;
+    caches.match(event.request, { ignoreSearch: true }).then(cached => {
+      if (cached) return cached;
 
+      return fetch(event.request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, copy);
+          });
+          return response;
+        })
+        .catch(() => {
           if (event.request.mode === 'navigate') {
+            const url = new URL(event.request.url);
+
+            if (url.pathname.endsWith('/generator.html')) {
+              return caches.match('./generator.html');
+            }
+
             return caches.match('./aziz2027.html');
           }
-        })
-      )
+        });
+    })
   );
 });
+  
+
+  
+    
+      
+        
+        
+          
+        
+        
+      
+      
+        
+        
+
+          
+            
+          
+        
+      
+  
+

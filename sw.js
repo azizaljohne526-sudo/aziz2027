@@ -1,18 +1,22 @@
-const CACHE_NAME = 'aziz2027-offline-v2';
+const CACHE_NAME = 'aziz2027-offline-v3';
 
 const FILES_TO_CACHE = [
-  './',
   './aziz2027.html',
   './generator.html',
   './activation.js'
 ];
-  
-  
-
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(FILES_TO_CACHE))
+    caches.open(CACHE_NAME).then(async cache => {
+      for (const file of FILES_TO_CACHE) {
+        try {
+          await cache.add(file);
+        } catch (e) {
+          console.log('لم يتم تخزين:', file);
+        }
+      }
+    })
   );
   self.skipWaiting();
 });
@@ -31,9 +35,25 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      return cached || fetch(event.request);
-    })
+    fetch(event.request)
+      .then(response => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, copy);
+        });
+        return response;
+      })
+      .catch(() =>
+        caches.match(event.request).then(cached => {
+          if (cached) return cached;
+
+          if (event.request.mode === 'navigate') {
+            return caches.match('./aziz2027.html');
+          }
+        })
+      )
   );
 });

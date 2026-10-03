@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aziz2027-offline-v4';
+const CACHE_NAME = 'aziz2027-offline-v5';
 
 const FILES_TO_CACHE = [
   './aziz2027.html',
@@ -38,31 +38,69 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then(cached => {
+    (async () => {
+      const url = new URL(event.request.url);
+
+      if (event.request.mode === 'navigate') {
+        if (url.pathname.endsWith('/generator.html')) {
+          const cachedGenerator = await caches.match('./generator.html', {
+            ignoreSearch: true
+          });
+          if (cachedGenerator) return cachedGenerator;
+        } else {
+          const cachedApp = await caches.match('./aziz2027.html', {
+            ignoreSearch: true
+          });
+          if (cachedApp) return cachedApp;
+        }
+      }
+
+      const cached = await caches.match(event.request, {
+        ignoreSearch: true
+      });
+
       if (cached) return cached;
 
-      return fetch(event.request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, copy);
-          });
-          return response;
-        })
-        .catch(() => {
-          if (event.request.mode === 'navigate') {
-            const url = new URL(event.request.url);
-
-            if (url.pathname.endsWith('/generator.html')) {
-              return caches.match('./generator.html');
-            }
-
-            return caches.match('./aziz2027.html');
-          }
-        });
-    })
+      try {
+        const response = await fetch(event.request);
+        const copy = response.clone();
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(event.request, copy);
+        return response;
+      } catch (e) {
+        return Response.error();
+      }
+    })()
   );
 });
+  
+
+  
+    
+      
+
+      
+        
+          
+          
+            
+          
+          
+        
+        
+          
+          
+
+            
+            
+            
+
+            
+          
+        
+    
+  
+
   
 
   

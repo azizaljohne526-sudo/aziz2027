@@ -2,6 +2,7 @@
 
   const SECRET = 'ABU-KHALID-AZIZ2027-PERMANENT';
   const ACTIVE_KEY = 'aziz2027_activation';
+  const EXPIRY_KEY = 'aziz2027_activation_expiry';
 
   function makeCode(device) {
     device = String(device || '').trim().toUpperCase();
@@ -35,6 +36,31 @@
     }
 
     return id;
+  }
+
+  function getDaysLeft() {
+    const expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
+
+    if (!expiry) return 0;
+
+    const diff = expiry - Date.now();
+
+    return Math.max(0, Math.ceil(diff / 86400000));
+  }
+
+  function activationValid() {
+    const active = localStorage.getItem(ACTIVE_KEY);
+    const expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
+
+    if (active !== '1' || !expiry) return false;
+
+    if (Date.now() >= expiry) {
+      localStorage.removeItem(ACTIVE_KEY);
+      localStorage.removeItem(EXPIRY_KEY);
+      return false;
+    }
+
+    return true;
   }
 
   function showActivation() {
@@ -123,7 +149,7 @@
               color:#fff;
               font-size:17px;
               font-weight:bold">
-            تفعيل البرنامج
+            تفعيل البرنامج لمدة سنة
           </button>
 
           <p id="akMessage"
@@ -142,14 +168,18 @@
         document.getElementById('akCode').value.trim().toUpperCase();
 
       if (entered === makeCode(device)) {
+
+        const expiry = Date.now() + (365 * 24 * 60 * 60 * 1000);
+
         localStorage.setItem(ACTIVE_KEY, '1');
+        localStorage.setItem(EXPIRY_KEY, String(expiry));
 
         document.getElementById('akMessage').textContent =
-          'تم التفعيل';
+          'تم التفعيل لمدة سنة — باقي 365 يوم';
 
         setTimeout(function () {
           location.reload();
-        }, 700);
+        }, 1000);
 
       } else {
         document.getElementById('akMessage').textContent =
@@ -158,12 +188,41 @@
     };
   }
 
-  if (localStorage.getItem(ACTIVE_KEY) !== '1') {
+  function showSubscriptionStatus() {
+    if (!activationValid()) return;
+
+    const days = getDaysLeft();
+
+    const box = document.createElement('div');
+    box.id = 'akSubscriptionStatus';
+
+    box.style.cssText =
+      'position:fixed;bottom:10px;left:10px;z-index:99999;' +
+      'background:#0d2118;color:#fff;border:1px solid #28543e;' +
+      'border-radius:10px;padding:8px 12px;font-family:Arial,sans-serif;' +
+      'font-size:14px;direction:rtl;';
+
+    box.textContent = 'الاشتراك: باقي ' + days + ' يوم';
+
+    document.body.appendChild(box);
+  }
+
+  if (!activationValid()) {
+
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', showActivation);
     } else {
       showActivation();
     }
+
+  } else {
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', showSubscriptionStatus);
+    } else {
+      showSubscriptionStatus();
+    }
+
   }
 
 })();

@@ -15,7 +15,84 @@ function eweForm(r={}){let opts=Array.from({length:12},(_,i)=>`<option ${n(r.age
 function births(){shell('👶 المواليد',`<button class="primary" onclick="birthForm()">➕ إضافة مولود</button><div>${db.births.map(raw=>{let b=normalizeBirth(raw);return card(`<h3>الأم ${esc(b.mother)} — ${esc(b.custom||b.type)}</h3><div>التاريخ: ${b.date} — العدد: ${fmt(b.count)} — طليان: ${fmt(b.males)} — رخال: ${fmt(b.females)} — العمر: ${ageText(b.date)}</div>${btns('births',b)}`)}).join('')||'<div class="empty">لا توجد مواليد</div>'}</div>`)}
 function birthForm(r={}){let selected=r.type||'طلي';formOpen(r.id?'تعديل مولود':'إضافة مولود',`<label>رقم الأم</label><input name="mother" required value="${esc(r.mother||'')}"><label>نوع المواليد</label><select name="type" id="birthType" onchange="birthOtherToggle()">${['طلي','رخلة','طليان','رخلتين','طلي ورخلة','أخرى'].map(x=>`<option ${selected===x?'selected':''}>${x}</option>`).join('')}</select><div id="birthOther" style="display:${selected==='أخرى'?'block':'none'}"><label>وش جابت الأم؟</label><input name="custom" placeholder="اكتب هنا: 2 طلي و1 رخلة" value="${esc(r.custom||'')}"><label>عدد الطليان</label><input type="number" min="0" name="customMales" value="${r.type==='أخرى'?(r.males||0):0}"><label>عدد الرخال</label><input type="number" min="0" name="customFemales" value="${r.type==='أخرى'?(r.females||0):0}"></div><label>التاريخ</label><input type="date" name="date" required value="${r.date||today()}">`,f=>{let o=Object.fromEntries(f);let mix=o.type==='أخرى'?{males:n(o.customMales),females:n(o.customFemales),count:n(o.customMales)+n(o.customFemales)}:birthMix(o.type,o.custom,1);if(o.type==='أخرى'&&mix.count<1){alert('اكتب عدد الطليان أو الرخال');return}o.id=r.id||id();o.count=mix.count;o.males=mix.males;o.females=mix.females;o.custom=o.type==='أخرى'?(o.custom||((mix.males?mix.males+' طليان ':'')+(mix.females?mix.females+' رخال':''))):'';delete o.customMales;delete o.customFemales;let ex=db.births.find(x=>!r.id&&x.mother===o.mother&&x.date===o.date);if(ex){let a=normalizeBirth(ex);ex.count=a.count+o.count;ex.males=a.males+o.males;ex.females=a.females+o.females;ex.type='أخرى';ex.custom=[a.custom||a.type,o.custom||o.type].filter(Boolean).join(' + ')}else db.births=r.id?db.births.map(x=>x.id===r.id?o:x):[o,...db.births];let e=db.ewes.find(x=>x.no===o.mother);if(e)e.lastBirth=o.date;addMove('مواليد',(r.id?'تعديل':'إضافة')+' مواليد للأم '+o.mother+' عدد '+o.count);save();births()})}
 function birthOtherToggle(){let s=$('#birthType'),d=$('#birthOther');if(s&&d)d.style.display=s.value==='أخرى'?'block':'none'}
-function deaths(){shell('☠️ النفوق',`<button class="primary" onclick="deathForm()">➕ إضافة نفوق</button>${db.deaths.map(d=>card(`<h3>${esc(d.kind)} — العدد ${fmt(d.count)}</h3><div>${d.kind==='مولود'?'الأم: '+esc(d.mother||'—')+' — النوع: '+esc(d.childType||'—'):'رقم الحيوان: '+esc(d.animalNo||'—')}</div><div>التاريخ: ${d.date}</div>${btns('deaths',d)}`)).join('')||'<div class="empty">لا يوجد نفوق</div>'}`)}function deathForm(r={}){formOpen(r.id?'تعديل نفوق':'إضافة نفوق',`<label>النوع</label><select name="kind" onchange="this.form.querySelector('.baby').style.display=this.value==='مولود'?'block':'none'"><option>نعجة</option><option>طلي</option><option>رخلة</option><option>فحل</option><option ${r.kind==='مولود'?'selected':''}>مولود</option></select><div class="baby" style="display:${r.kind==='مولود'?'block':'none'}"><label>رقم الأم</label><input name="mother" value="${esc(r.mother||'')}"><label>وش اللي مات لها</label><select name="childType"><option>طلي</option><option>رخلة</option><option>طليان</option><option>رخلتين</option><option>أخرى</option></select></div><label>رقم الحيوان (اختياري)</label><input name="animalNo" value="${esc(r.animalNo||'')}"><label>العدد</label><input type="number" min="1" name="count" value="${r.count||1}"><label>التاريخ</label><input type="date" name="date" value="${r.date||today()}">`,f=>{let o=Object.fromEntries(f);o.id=r.id||id();db.deaths=r.id?db.deaths.map(x=>x.id===r.id?o:x):[o,...db.deaths];addMove('نفوق',(r.id?'تعديل':'إضافة')+' نفوق '+o.kind);save();deaths()})}
+function deaths(){
+  shell('☠️ النفوق',
+  `<button class="primary" onclick="deathForm()">➕ إضافة نفوق</button>
+  ${db.deaths.map(d=>card(`
+    <h3>${esc(d.kind)} — العدد ${fmt(d.count)}</h3>
+    <div>
+      ${d.kind==='مولود'
+        ?'الأم: '+esc(d.mother||'—')+' — النوع: '+esc(d.childType==='أخرى'?(d.childOther||'أخرى'):(d.childType||'—'))
+        :'رقم الحيوان: '+esc(d.animalNo||'—')}
+    </div>
+    <div>التاريخ: ${d.date}</div>
+    ${btns('deaths',d)}
+  `)).join('')||'<div class="empty">لا يوجد نفوق</div>'}`)
+}
+
+function deathForm(r={}){
+  formOpen(r.id?'تعديل نفوق':'إضافة نفوق',`
+    <label>النوع</label>
+    <select name="kind" onchange="
+      this.form.querySelector('.baby').style.display=this.value==='مولود'?'block':'none'
+    ">
+      <option ${r.kind==='نعجة'?'selected':''}>نعجة</option>
+      <option ${r.kind==='طلي'?'selected':''}>طلي</option>
+      <option ${r.kind==='رخلة'?'selected':''}>رخلة</option>
+      <option ${r.kind==='فحل'?'selected':''}>فحل</option>
+      <option ${r.kind==='مولود'?'selected':''}>مولود</option>
+    </select>
+
+    <div class="baby" style="display:${r.kind==='مولود'?'block':'none'}">
+      <label>رقم الأم</label>
+      <input name="mother" value="${esc(r.mother||'')}">
+
+      <label>وش اللي مات لها</label>
+      <select name="childType" onchange="
+        this.form.querySelector('.deathOther').style.display=this.value==='أخرى'?'block':'none'
+      ">
+        <option ${r.childType==='طلي'?'selected':''}>طلي</option>
+        <option ${r.childType==='رخلة'?'selected':''}>رخلة</option>
+        <option ${r.childType==='طليان'?'selected':''}>طليان</option>
+        <option ${r.childType==='رخلتين'?'selected':''}>رخلتين</option>
+        <option ${r.childType==='طلي ورخلة'?'selected':''}>طلي ورخلة</option>
+        <option ${r.childType==='أخرى'?'selected':''}>أخرى</option>
+      </select>
+
+      <div class="deathOther" style="display:${r.childType==='أخرى'?'block':'none'}">
+        <label>اكتب وش المتوفي</label>
+        <input name="childOther" value="${esc(r.childOther||'')}" placeholder="اكتب النوع">
+      </div>
+    </div>
+
+    <label>رقم الحيوان (اختياري)</label>
+    <input name="animalNo" value="${esc(r.animalNo||'')}">
+
+    <label>العدد</label>
+    <input type="number" min="1" name="count" value="${r.count||1}">
+
+    <label>التاريخ</label>
+    <input type="date" name="date" value="${r.date||today()}">
+  `,f=>{
+    let o=Object.fromEntries(f);
+
+    if(o.kind==='مولود'){
+      if(o.childType==='طلي ورخلة') o.count=2;
+      else if(o.childType==='طليان') o.count=2;
+      else if(o.childType==='رخلتين') o.count=2;
+    }
+
+    o.id=r.id||id();
+
+    db.deaths=r.id
+      ?db.deaths.map(x=>x.id===r.id?o:x)
+      :[o,...db.deaths];
+
+    addMove('نفوق',(r.id?'تعديل':'إضافة')+' نفوق '+o.kind);
+    save();
+    deaths();
+  })
+}
 const purchaseTypes=['علف','شعير','مكعبات','خبز','شبوك','معالف','موية','أخرى'];function purchases(){listMoney('🛒 المشتريات','purchases','إضافة مشتريات',purchaseTypes)}function expenses(){listMoney('💰 المصاريف','expenses','إضافة مصروف',['علاج','راتب العامل','بيطري','نقل','صيانة','كهرباء','وقود','أخرى'])}function listMoney(title,type,label,types){let arr=db[type];shell(title,`<div class="stats"><div class="stat"><b>${fmt(arr.reduce((a,b)=>a+n(b.total||b.amount),0))}</b>الإجمالي</div><div class="stat"><b>${fmt(arr.length)}</b>عدد العمليات</div></div><button class="primary" onclick="moneyForm('${type}')">➕ ${label}</button>${arr.map(r=>card(`<h3>${esc(r.type)}</h3><div>${r.qty?'الكمية: '+fmt(r.qty)+' — سعر الوحدة: '+money(r.price)+' — ':''}الإجمالي: ${money(r.total||r.amount)}</div><div>${r.date}</div>${btns(type,r)}`)).join('')||'<div class="empty">لا توجد سجلات</div>'}`)}function moneyForm(type,r={}){let types=type==='purchases'?purchaseTypes:['علاج','راتب العامل','بيطري','نقل','صيانة','كهرباء','وقود','أخرى'];formOpen(r.id?'تعديل':'إضافة',`<label>النوع</label><select name="type">${types.map(x=>`<option ${r.type===x?'selected':''}>${x}</option>`).join('')}</select>${type==='purchases'?`<label>الكمية</label><input type="number" step="any" name="qty" value="${r.qty||''}"><label>سعر الوحدة</label><input type="number" step="any" name="price" value="${r.price||''}">`:`<label>المبلغ</label><input type="number" step="any" name="amount" value="${r.amount||''}">`}<label>التاريخ</label><input type="date" name="date" value="${r.date||today()}"><label>ملاحظة</label><input name="note" value="${esc(r.note||'')}">`,f=>{let o=Object.fromEntries(f);o.id=r.id||id();if(type==='purchases')o.total=n(o.qty)*n(o.price);db[type]=r.id?db[type].map(x=>x.id===r.id?o:x):[o,...db[type]];addMove(type==='purchases'?'مشتريات':'مصاريف',(r.id?'تعديل ':'إضافة ')+o.type);save();listMoney(type==='purchases'?'🛒 المشتريات':'💰 المصاريف',type,'',types)})}
 function sales(){shell('💵 البيع',`<div class="stats"><div class="stat"><b>${fmt(db.sales.reduce((a,b)=>a+n(b.total),0))}</b>إجمالي المبيعات</div><div class="stat"><b>${fmt(db.sales.length)}</b>الرؤوس المباعة</div></div><button class="primary" onclick="saleForm()">➕ إضافة بيع</button>${db.sales.map(r=>card(`<h3>${esc(r.type)} × ${fmt(r.count)}</h3><div>المشتري: ${esc(r.buyer||'غير مسجل')} — الإجمالي: ${money(r.total)}</div><div>${r.date}</div>${btns('sales',r)}`)).join('')||'<div class="empty">لا توجد مبيعات</div>'}`)}function saleForm(r={}){formOpen(r.id?'تعديل بيع':'إضافة بيع',`<label>النوع</label><select name="type"><option>طلي</option><option>رخلة</option><option>نعجة</option><option>فحل</option></select><label>العدد</label><input type="number" min="1" name="count" value="${r.count||1}"><label>رقم الحيوان (اختياري)</label><input name="animalNo" value="${esc(r.animalNo||'')}"><label>سعر الواحد</label><input type="number" name="price" value="${r.price||''}"><label>اسم المشتري</label><input name="buyer" value="${esc(r.buyer||'')}"><label>الجوال</label><input name="phone" value="${esc(r.phone||'')}"><label>التاريخ</label><input type="date" name="date" value="${r.date||today()}">`,f=>{let o=Object.fromEntries(f);o.id=r.id||id();o.total=n(o.count)*n(o.price);db.sales=r.id?db.sales.map(x=>x.id===r.id?o:x):[o,...db.sales];addMove('بيع',(r.id?'تعديل':'إضافة')+' بيع '+o.type);save();sales()})}
 function vaccines(){shell('💉 التطعيمات',`<button class="primary" onclick="vaccineForm()">➕ إضافة تطعيم</button>${db.vaccines.map(r=>{let next=addMonths(r.date,r.type==='دود'?3:6),left=-days(next);return card(`<h3>${esc(r.type)} 💉</h3><div>الفئة: ${esc(r.group)} — الحيوان: ${esc(r.animalNo||'الكل')}</div><div>التاريخ: ${r.date} — القادم: ${next} — باقي ${fmt(left)} يوم</div>${btns('vaccines',r)}`)}).join('')||'<div class="empty">لا توجد تطعيمات</div>'}`)}function vaccineForm(r={}){formOpen(r.id?'تعديل تطعيم':'إضافة تطعيم',`<label>الفئة</label><select name="group"><option>الحلال كله</option><option>الطليان</option><option>الرخال</option><option>النعاج</option><option>طلي</option><option>رخلة</option><option>نعجة</option></select><label>نوع التطعيم</label><select name="type"><option>هويجر</option><option>دموي</option><option>معوي</option><option>طاعون</option><option>جدري</option><option>دود</option><option>أخرى</option></select><label>رقم الحيوان إن كان فرديًا</label><input name="animalNo" value="${esc(r.animalNo||'')}"><label>التاريخ</label><input type="date" name="date" value="${r.date||today()}"><label>ملاحظة</label><input name="note" value="${esc(r.note||'')}">`,f=>{let o=Object.fromEntries(f);o.id=r.id||id();db.vaccines=r.id?db.vaccines.map(x=>x.id===r.id?o:x):[o,...db.vaccines];addMove('تطعيم',(r.id?'تعديل':'إضافة')+' '+o.type);save();vaccines()})}

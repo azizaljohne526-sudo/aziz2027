@@ -193,6 +193,51 @@ function vaccines(){
     `)
   }).join('')||'<div class="empty">لا توجد تطعيمات</div>'}`)
 }
+  function vaccineForm(r={}){
+  formOpen(r.id?'تعديل تطعيم':'إضافة تطعيم',`
+    <label>الفئة</label>
+    <select name="group">
+      <option ${r.group==='الحلال كله'?'selected':''}>الحلال كله</option>
+      <option ${r.group==='الطليان'?'selected':''}>الطليان</option>
+      <option ${r.group==='الرخال'?'selected':''}>الرخال</option>
+      <option ${r.group==='النعاج'?'selected':''}>النعاج</option>
+      <option ${r.group==='طلي'?'selected':''}>طلي</option>
+      <option ${r.group==='رخلة'?'selected':''}>رخلة</option>
+      <option ${r.group==='نعجة'?'selected':''}>نعجة</option>
+    </select>
+
+    <label>نوع التطعيم</label>
+    <select name="type">
+      <option ${r.type==='هويجر'?'selected':''}>هويجر</option>
+      <option ${r.type==='دموي'?'selected':''}>دموي</option>
+      <option ${r.type==='معوي'?'selected':''}>معوي</option>
+      <option ${r.type==='طاعون'?'selected':''}>طاعون</option>
+      <option ${r.type==='جدري'?'selected':''}>جدري</option>
+      <option ${r.type==='دود'?'selected':''}>دود</option>
+      <option ${r.type==='أخرى'?'selected':''}>أخرى</option>
+    </select>
+
+    <label>رقم الحيوان إن كان فرديًا</label>
+    <input name="animalNo" value="${esc(r.animalNo||'')}">
+
+    <label>التاريخ</label>
+    <input type="date" name="date" value="${r.date||today()}">
+
+    <label>ملاحظة</label>
+    <input name="note" value="${esc(r.note||'')}">
+  `,f=>{
+    let o=Object.fromEntries(f);
+    o.id=r.id||id();
+
+    db.vaccines=r.id
+      ?db.vaccines.map(x=>x.id===r.id?o:x)
+      :[o,...db.vaccines];
+
+    addMove('تطعيم',(r.id?'تعديل':'إضافة')+' '+o.type);
+    save();
+    vaccines();
+  })
+}
 function eweStats(e){let no=String(e.no||e.mother||''),bs=db.births.filter(b=>String(b.mother)===no).map(normalizeBirth),born=bs.reduce((a,b)=>a+n(b.count),0),dead=db.deaths.filter(d=>d.kind==='مولود'&&String(d.mother)===no).reduce((a,b)=>a+n(b.count),0),lastBirth=bs.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]?.date||e.lastBirth||'';return{bs,born,dead,live:Math.max(0,born-dead),last:lastBirth,next:lastBirth?addMonths(lastBirth,6):''}}
 function reportMothers(){let map=new Map();db.ewes.forEach(e=>map.set(String(e.no),e));db.births.forEach(b=>{let k=String(b.mother||'');if(k&&!map.has(k))map.set(k,{id:'report-'+k,no:k,status:'—',regDate:'',lastBirth:b.date,_reportOnly:true})});return [...map.values()]}
 function eweReport(){

@@ -13,7 +13,85 @@ function openPage(p){({herd,births,deaths,purchases,expenses,sales,vaccines,eweR
 function herd(){shell('🐑 سجل القطيع',`<div class="stats"><div class="stat"><b>${fmt(db.ewes.length)}</b>عدد النعاج</div><div class="stat"><b>${fmt(db.ewes.filter(e=>e.lastBirth).length)}</b>والدة</div><div class="stat"><b>${fmt(db.ewes.filter(e=>e.lastBirth&&days(addMonths(e.lastBirth,7))>0).length)}</b>متأخرة</div></div><button class="primary" onclick="eweForm()">➕ إضافة نعجة</button><input class="search" placeholder="🔎 بحث برقم النعجة" oninput="filterCards(this.value)"><div id="cards">${db.ewes.map(e=>card(`<h3>النعجة رقم ${esc(e.no)}</h3><div>العمر: ${ageText(e.regDate)} — الحالة: ${esc(e.status)}</div><div>تاريخ التسجيل: ${e.regDate} — آخر ولادة: ${e.lastBirth||'—'}</div>${btns('ewes',e)}`)).join('')||'<div class="empty">لا توجد نعاج</div>'}</div>`)}
 function eweForm(r={}){let opts=Array.from({length:12},(_,i)=>`<option ${n(r.ageMonths)===i+1?'selected':''}>${i+1}</option>`).join('');formOpen(r.id?'تعديل نعجة':'إضافة نعجة',`<label>رقم النعجة</label><input name="no" required value="${esc(r.no||'')}"><label>العمر عند التسجيل (1–12 شهر)</label><select name="ageMonths">${opts}</select><label>الحالة</label><select name="status"><option>جيدة</option><option ${r.status==='تعبانة'?'selected':''}>تعبانة</option></select><label>تاريخ التسجيل</label><input type="date" name="regDate" required value="${r.regDate||today()}"><label>تاريخ آخر ولادة</label><input type="date" name="lastBirth" value="${r.lastBirth||''}">`,f=>{let o=Object.fromEntries(f);if(db.ewes.some(x=>x.no===o.no&&x.id!==r.id))return alert('رقم النعجة موجود مسبقًا');o.id=r.id||id();db.ewes=r.id?db.ewes.map(x=>x.id===r.id?o:x):[o,...db.ewes];addMove('نعجة',(r.id?'تعديل':'إضافة')+' النعجة '+o.no);save();herd()})}
 function births(){shell('👶 المواليد',`<button class="primary" onclick="birthForm()">➕ إضافة مولود</button><div>${db.births.map(raw=>{let b=normalizeBirth(raw);return card(`<h3>الأم ${esc(b.mother)} — ${esc(b.custom||b.type)}</h3><div>التاريخ: ${b.date} — العدد: ${fmt(b.count)} — طليان: ${fmt(b.males)} — رخال: ${fmt(b.females)} — العمر: ${ageText(b.date)}</div>${btns('births',b)}`)}).join('')||'<div class="empty">لا توجد مواليد</div>'}</div>`)}
-function birthForm(r={}){let selected=r.type||'طلي';formOpen(r.id?'تعديل مولود':'إضافة مولود',`<label>رقم الأم</label><input name="mother" required value="${esc(r.mother||'')}"><label>نوع المواليد</label><select name="type" id="birthType" onchange="birthOtherToggle()">${['طلي','رخلة','طليان','رخلتين','طلي ورخلة','أخرى'].map(x=>`<option ${selected===x?'selected':''}>${x}</option>`).join('')}</select><div id="birthOther" style="display:${selected==='أخرى'?'block':'none'}"><label>وش جابت الأم؟</label><input name="custom" placeholder="اكتب هنا: 2 طلي و1 رخلة" value="${esc(r.custom||'')}"><label>عدد الطليان</label><input type="number" min="0" name="customMales" value="${r.type==='أخرى'?(r.males||0):0}"><label>عدد الرخال</label><input type="number" min="0" name="customFemales" value="${r.type==='أخرى'?(r.females||0):0}"></div><label>التاريخ</label><input type="date" name="date" required value="${r.date||today()}">`,f=>{let o=Object.fromEntries(f);let mix=o.type==='أخرى'?{males:n(o.customMales),females:n(o.customFemales),count:n(o.customMales)+n(o.customFemales)}:birthMix(o.type,o.custom,1);if(o.type==='أخرى'&&mix.count<1){alert('اكتب عدد الطليان أو الرخال');return}o.id=r.id||id();o.count=mix.count;o.males=mix.males;o.females=mix.females;o.custom=o.type==='أخرى'?(o.custom||((mix.males?mix.males+' طليان ':'')+(mix.females?mix.females+' رخال':''))):'';delete o.customMales;delete o.customFemales;let ex=db.births.find(x=>!r.id&&x.mother===o.mother&&x.date===o.date);if(ex){let a=normalizeBirth(ex);ex.count=a.count+o.count;ex.males=a.males+o.males;ex.females=a.females+o.females;ex.type='أخرى';ex.custom=[a.custom||a.type,o.custom||o.type].filter(Boolean).join(' + ')}else db.births=r.id?db.births.map(x=>x.id===r.id?o:x):[o,...db.births];let e=db.ewes.find(x=>x.no===o.mother);if(e)e.lastBirth=o.date;addMove('مواليد',(r.id?'تعديل':'إضافة')+' مواليد للأم '+o.mother+' عدد '+o.count);save();births()})}
+function birthForm(r={}){
+  let selected=r.type||'طلي';
+
+  formOpen(r.id?'تعديل مولود':'إضافة مولود',`
+    <label>رقم الأم</label>
+    <input name="mother" required value="${esc(r.mother||'')}">
+
+    <label>نوع المواليد</label>
+    <select name="type" id="birthType" onchange="birthOtherToggle()">
+      ${['طلي','رخلة','طليان','رخلتين','طلي ورخلة','أخرى']
+        .map(x=>`<option ${selected===x?'selected':''}>${x}</option>`)
+        .join('')}
+    </select>
+
+    <div id="birthOther" style="display:${selected==='أخرى'?'block':'none'}">
+      <label>وش جابت الأم؟</label>
+      <input name="custom" placeholder="اكتب هنا: 2 طلي و1 رخلة" value="${esc(r.custom||'')}">
+
+      <label>عدد الطليان</label>
+      <input type="number" min="0" name="customMales"
+        value="${r.type==='أخرى'?(r.males||0):0}">
+
+      <label>عدد الرخال</label>
+      <input type="number" min="0" name="customFemales"
+        value="${r.type==='أخرى'?(r.females||0):0}">
+    </div>
+
+    <label>التاريخ</label>
+    <input type="date" name="date" required value="${r.date||today()}">
+  `,f=>{
+    let o=Object.fromEntries(f);
+
+    let mix=o.type==='أخرى'
+      ?{
+          males:n(o.customMales),
+          females:n(o.customFemales),
+          count:n(o.customMales)+n(o.customFemales)
+        }
+      :birthMix(o.type,o.custom,1);
+
+    if(o.type==='أخرى'&&mix.count<1){
+      alert('اكتب عدد الطليان أو الرخال');
+      return;
+    }
+
+    o.id=r.id||id();
+    o.count=mix.count;
+    o.males=mix.males;
+    o.females=mix.females;
+
+    o.custom=o.type==='أخرى'
+      ?(o.custom||(
+        (mix.males?mix.males+' طليان ':'')+
+        (mix.females?mix.females+' رخال':'')
+      ))
+      :'';
+
+    delete o.customMales;
+    delete o.customFemales;
+
+    // كل ولادة تحفظ كسجل مستقل
+    db.births=r.id
+      ?db.births.map(x=>x.id===r.id?o:x)
+      :[o,...db.births];
+
+    let e=db.ewes.find(x=>x.no===o.mother);
+    if(e)e.lastBirth=o.date;
+
+    addMove(
+      'مواليد',
+      (r.id?'تعديل':'إضافة')+
+      ' مواليد للأم '+o.mother+
+      ' عدد '+o.count
+    );
+
+    save();
+    births();
+  })
+}
 function birthOtherToggle(){let s=$('#birthType'),d=$('#birthOther');if(s&&d)d.style.display=s.value==='أخرى'?'block':'none'}
 function deaths(){
   shell('☠️ النفوق',

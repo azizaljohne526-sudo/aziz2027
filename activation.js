@@ -1,27 +1,9 @@
 (function () {
 
-  const SECRET = 'ABU-KHALID-AZIZ2027-PERMANENT';
   const ACTIVE_KEY = 'aziz2027_activation';
-  const EXPIRY_KEY = 'aziz2027_activation_expiry';
 
-  function makeCode(device) {
-    device = String(device || '').trim().toUpperCase();
-
-    let hash = 2166136261;
-    const text = device + '|' + SECRET;
-
-    for (let i = 0; i < text.length; i++) {
-      hash ^= text.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
-
-    const part = (hash >>> 0)
-      .toString(16)
-      .toUpperCase()
-      .padStart(8, '0');
-
-    return 'AK-' + part;
-  }
+  const VERIFY_URL =
+    'https://zvdxvvkvdlfbsdhxfvtq.supabase.co/functions/v1/smooth-processor';
 
   function getDeviceId() {
     let id = localStorage.getItem('aziz2027_device_id');
@@ -36,31 +18,6 @@
     }
 
     return id;
-  }
-
-  function getDaysLeft() {
-    const expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
-
-    if (!expiry) return 0;
-
-    const diff = expiry - Date.now();
-
-    return Math.max(0, Math.ceil(diff / 86400000));
-  }
-
-  function activationValid() {
-    const active = localStorage.getItem(ACTIVE_KEY);
-    const expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
-
-    if (active !== '1' || !expiry) return false;
-
-    if (Date.now() >= expiry) {
-      localStorage.removeItem(ACTIVE_KEY);
-      localStorage.removeItem(EXPIRY_KEY);
-      return false;
-    }
-
-    return true;
   }
 
   function showActivation() {
@@ -149,7 +106,7 @@
               color:#fff;
               font-size:17px;
               font-weight:bold">
-            تفعيل البرنامج لمدة سنة
+            تفعيل البرنامج
           </button>
 
           <p id="akMessage"
@@ -163,66 +120,79 @@
       navigator.clipboard.writeText(device);
     };
 
-    document.getElementById('activateBtn').onclick = function () {
-      const entered =
+    document.getElementById('activateBtn').onclick = async function () {
+      const code =
         document.getElementById('akCode').value.trim().toUpperCase();
 
-      if (entered === makeCode(device)) {
+      const message = document.getElementById('akMessage');
+      const button = document.getElementById('activateBtn');
 
-        const expiry = Date.now() + (365 * 24 * 60 * 60 * 1000);
+      if (!code) {
+        message.textContent = 'أدخل كود التفعيل';
+        return;
+      }
 
-        localStorage.setItem(ACTIVE_KEY, '1');
-        localStorage.setItem(EXPIRY_KEY, String(expiry));
+      button.disabled = true;
+      message.textContent = 'جاري التحقق...';
 
-        document.getElementById('akMessage').textContent =
-          'تم التفعيل لمدة سنة — باقي 365 يوم';
+      try {
 
-        setTimeout(function () {
-          location.reload();
-        }, 1000);
+        const response = await fetch(VERIFY_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            device: device,
+            code: code
+          })
+        });
 
-      } else {
-        document.getElementById('akMessage').textContent =
-          'كود التفعيل غير صحيح';
+        const result = await response.json();
+
+        if (response.ok && result.ok === true) {
+
+          localStorage.setItem(ACTIVE_KEY, '1');
+
+          message.textContent = 'تم التفعيل';
+
+          setTimeout(function () {
+            location.reload();
+          }, 700);
+
+        } else {
+
+          message.textContent = 'كود التفعيل غير صحيح';
+
+        }
+
+      } catch (error) {
+
+        message.textContent =
+          'تعذر الاتصال بخادم التفعيل، تأكد من الإنترنت';
+
+      } finally {
+
+        button.disabled = false;
+
       }
     };
   }
 
-  function showSubscriptionStatus() {
-    if (!activationValid()) return;
-
-    const days = getDaysLeft();
-
-    const box = document.createElement('div');
-    box.id = 'akSubscriptionStatus';
-
-    box.style.cssText =
-      'position:fixed;bottom:10px;left:10px;z-index:99999;' +
-      'background:#0d2118;color:#fff;border:1px solid #28543e;' +
-      'border-radius:10px;padding:8px 12px;font-family:Arial,sans-serif;' +
-      'font-size:14px;direction:rtl;';
-
-    box.textContent = 'الاشتراك: باقي ' + days + ' يوم';
-
-    document.body.appendChild(box);
-  }
-
-  if (!activationValid()) {
+  if (localStorage.getItem(ACTIVE_KEY) !== '1') {
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', showActivation);
+
+      document.addEventListener(
+        'DOMContentLoaded',
+        showActivation
+      );
+
     } else {
+
       showActivation();
+
     }
-
-  } else {
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', showSubscriptionStatus);
-    } else {
-      showSubscriptionStatus();
-    }
-
   }
 
 })();

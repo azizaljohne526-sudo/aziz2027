@@ -1,6 +1,8 @@
 (function () {
 
   const ACTIVE_KEY = 'aziz2027_activation';
+  const EXPIRY_KEY = 'aziz2027_activation_expiry';
+  const ACTIVATION_DAYS = 365;
 
   const VERIFY_URL =
     'https://zvdxvvkvdlfbsdhxfvtq.supabase.co/functions/v1/smooth-processor';
@@ -14,13 +16,32 @@
         Math.random().toString(36).slice(2);
 
       id = 'AKD-' + random.toUpperCase();
+
       localStorage.setItem('aziz2027_device_id', id);
     }
 
     return id;
   }
 
+  function isActivated() {
+    const active = localStorage.getItem(ACTIVE_KEY);
+    const expiry = Number(localStorage.getItem(EXPIRY_KEY));
+
+    if (active !== '1') {
+      return false;
+    }
+
+    if (!expiry || Date.now() >= expiry) {
+      localStorage.removeItem(ACTIVE_KEY);
+      localStorage.removeItem(EXPIRY_KEY);
+      return false;
+    }
+
+    return true;
+  }
+
   function showActivation() {
+
     const device = getDeviceId();
 
     document.body.innerHTML = `
@@ -49,9 +70,14 @@
             🐑 تفعيل حلال أبو خالد
           </h2>
 
+          <p style="text-align:center">
+            هذا الجهاز يحتاج تفعيل لمدة سنة كاملة (365 يوم).
+          </p>
+
           <p>رقم الجهاز</p>
 
-          <input id="akDevice"
+          <input
+            id="akDevice"
             value="${device}"
             readonly
             style="
@@ -66,7 +92,8 @@
               direction:ltr;
               font-size:17px">
 
-          <button id="copyDevice"
+          <button
+            id="copyDevice"
             style="
               width:100%;
               padding:14px;
@@ -76,12 +103,14 @@
               background:#2fa052;
               color:#fff;
               font-size:17px">
+
             نسخ رقم الجهاز
           </button>
 
           <p>كود التفعيل</p>
 
-          <input id="akCode"
+          <input
+            id="akCode"
             autocomplete="off"
             style="
               width:100%;
@@ -95,7 +124,8 @@
               direction:ltr;
               font-size:17px">
 
-          <button id="activateBtn"
+          <button
+            id="activateBtn"
             style="
               width:100%;
               padding:14px;
@@ -106,11 +136,14 @@
               color:#fff;
               font-size:17px;
               font-weight:bold">
-            تفعيل البرنامج
+
+            تفعيل لمدة سنة
           </button>
 
-          <p id="akMessage"
-            style="text-align:center;margin-top:15px"></p>
+          <p
+            id="akMessage"
+            style="text-align:center;margin-top:15px">
+          </p>
 
         </div>
       </div>
@@ -121,11 +154,19 @@
     };
 
     document.getElementById('activateBtn').onclick = async function () {
-      const code =
-        document.getElementById('akCode').value.trim().toUpperCase();
 
-      const message = document.getElementById('akMessage');
-      const button = document.getElementById('activateBtn');
+      const code =
+        document
+          .getElementById('akCode')
+          .value
+          .trim()
+          .toUpperCase();
+
+      const message =
+        document.getElementById('akMessage');
+
+      const button =
+        document.getElementById('activateBtn');
 
       if (!code) {
         message.textContent = 'أدخل كود التفعيل';
@@ -139,9 +180,11 @@
 
         const response = await fetch(VERIFY_URL, {
           method: 'POST',
+
           headers: {
             'Content-Type': 'application/json'
           },
+
           body: JSON.stringify({
             device: device,
             code: code
@@ -152,9 +195,22 @@
 
         if (response.ok && result.ok === true) {
 
-          localStorage.setItem(ACTIVE_KEY, '1');
+          const expiry =
+            Date.now() +
+            ACTIVATION_DAYS *
+            24 *
+            60 *
+            60 *
+            1000;
 
-          message.textContent = 'تم التفعيل';
+          localStorage.setItem(ACTIVE_KEY, '1');
+          localStorage.setItem(
+            EXPIRY_KEY,
+            String(expiry)
+          );
+
+          message.textContent =
+            'تم التفعيل لمدة سنة كاملة (365 يوم)';
 
           setTimeout(function () {
             location.reload();
@@ -162,7 +218,8 @@
 
         } else {
 
-          message.textContent = 'كود التفعيل غير صحيح';
+          message.textContent =
+            'كود التفعيل غير صحيح';
 
         }
 
@@ -179,7 +236,15 @@
     };
   }
 
-  if (localStorage.getItem(ACTIVE_KEY) !== '1') {
+  /*
+    إذا كان التفعيل موجودًا وصالحًا:
+    يدخل البرنامج عادي.
+
+    إذا انتهت الـ365 يوم:
+    يرجع إلى شاشة التفعيل.
+  */
+
+  if (!isActivated()) {
 
     if (document.readyState === 'loading') {
 

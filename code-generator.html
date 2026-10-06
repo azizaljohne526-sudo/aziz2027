@@ -81,6 +81,8 @@ button{
 <div class="card">
 
 <h2>🐑 مولد أكواد حلال أبو خالد</h2>
+  <label>الرقم السري</label>
+<input id="password" type="password" value="" autocomplete="off">
 
 <label>رقم الجهاز</label>
 <input id="device" type="text" value="" autocomplete="off">
@@ -102,6 +104,7 @@ const ENDPOINT =
 "https://zvdxvvkvdlfbsdhxfvtq.supabase.co/functions/v1/rapid-handler";
 
 const device = document.getElementById("device");
+  const password = document.getElementById("password");
 const code = document.getElementById("code");
 const msg = document.getElementById("msg");
 const generate = document.getElementById("generate");
@@ -109,6 +112,7 @@ const generate = document.getElementById("generate");
 generate.addEventListener("click", async function(){
 
   const deviceId = device.value.trim().toUpperCase();
+  const passwordValue = password.value;
 
   code.value = "";
   msg.textContent = "";
@@ -128,7 +132,7 @@ generate.addEventListener("click", async function(){
       headers:{
         "Content-Type":"application/json"
       },
-      body:JSON.stringify({device:deviceId})
+      body:JSON.stringify({device:deviceId,password:passwordValue})
     });
 
     const data = await response.json();

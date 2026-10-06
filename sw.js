@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aziz2027-offline-v18';
+const CACHE_NAME = 'aziz2027-offline-v19';
 
 const FILES_TO_CACHE = [
   './aziz2027.html',
@@ -18,6 +18,7 @@ self.addEventListener('install', event => {
       }
     })
   );
+
   self.skipWaiting();
 });
 
@@ -31,6 +32,7 @@ self.addEventListener('activate', event => {
       )
     )
   );
+
   self.clients.claim();
 });
 
@@ -39,21 +41,6 @@ self.addEventListener('fetch', event => {
 
   event.respondWith(
     (async () => {
-      const url = new URL(event.request.url);
-
-      if (event.request.mode === 'navigate') {
-        if (url.pathname.endsWith('/generator.html')) {
-          const cachedGenerator = await caches.match('./generator.html', {
-            ignoreSearch: true
-          });
-          if (cachedGenerator) return cachedGenerator;
-        } else {
-          const cachedApp = await caches.match('./aziz2027.html', {
-            ignoreSearch: true
-          });
-          if (cachedApp) return cachedApp;
-        }
-      }
 
       const cached = await caches.match(event.request, {
         ignoreSearch: true
@@ -70,10 +57,10 @@ self.addEventListener('fetch', event => {
       } catch (e) {
         return Response.error();
       }
+
     })()
   );
 });
-  
 
   
     

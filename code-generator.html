@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مولد أكواد حلال أبو خالد</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:#06130e;
+  color:#fff;
+  font-family:Arial,sans-serif;
+}
+
+.wrap{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+
+.card{
+  width:100%;
+  max-width:500px;
+  background:#0d2118;
+  border:1px solid #2a5942;
+  border-radius:18px;
+  padding:24px;
+}
+
+h2{
+  text-align:center;
+  color:#5ee08f;
+}
+
+label{
+  display:block;
+  margin:15px 0 7px;
+}
+
+input{
+  width:100%;
+  padding:14px;
+  border-radius:10px;
+  border:1px solid #3d6b55;
+  background:#07140f;
+  color:#fff;
+  text-align:center;
+  direction:ltr;
+  font-size:17px;
+}
+
+button{
+  width:100%;
+  padding:14px;
+  margin-top:12px;
+  border:0;
+  border-radius:10px;
+  background:#2fa052;
+  color:#fff;
+  font-size:17px;
+  font-weight:bold;
+}
+
+#msg{
+  text-align:center;
+  margin-top:15px;
+  min-height:24px;
+  color:#8ce6ad;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+<div class="card">
+
+<h2>🐑 مولد أكواد حلال أبو خالد</h2>
+
+<label>رقم الجهاز</label>
+<input id="device" type="text" value="" autocomplete="off">
+
+<button id="generate">توليد الكود</button>
+
+<label>كود التفعيل</label>
+<input id="code" type="text" value="" readonly>
+
+<button id="copy">نسخ كود التفعيل</button>
+
+<div id="msg"></div>
+
+</div>
+</div>
+
+<script>
+const ENDPOINT =
+"https://zvdxvvkvdlfbsdhxfvtq.supabase.co/functions/v1/rapid-handler";
+
+const device = document.getElementById("device");
+const code = document.getElementById("code");
+const msg = document.getElementById("msg");
+const generate = document.getElementById("generate");
+
+generate.addEventListener("click", async function(){
+
+  const deviceId = device.value.trim().toUpperCase();
+
+  code.value = "";
+  msg.textContent = "";
+
+  if(deviceId === ""){
+    msg.textContent = "اكتب رقم الجهاز";
+    return;
+  }
+
+  generate.disabled = true;
+  msg.textContent = "جاري توليد الكود...";
+
+  try{
+
+    const response = await fetch(ENDPOINT,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({device:deviceId})
+    });
+
+    const data = await response.json();
+
+    if(response.ok && data.ok === true && data.code){
+      code.value = data.code;
+      msg.textContent = "تم توليد الكود";
+    }else{
+      msg.textContent = "تعذر توليد الكود";
+    }
+
+  }catch(error){
+    msg.textContent = "تعذر الاتصال بسيرفر التفعيل";
+  }
+
+  generate.disabled = false;
+
+});
+
+document.getElementById("copy").addEventListener("click", async function(){
+
+  if(code.value === ""){
+    msg.textContent = "ولّد الكود أولاً";
+    return;
+  }
+
+  try{
+    await navigator.clipboard.writeText(code.value);
+    msg.textContent = "تم نسخ كود التفعيل";
+  }catch(error){
+    code.select();
+    document.execCommand("copy");
+    msg.textContent = "تم نسخ كود التفعيل";
+  }
+
+});
+</script>
+
+</body>
+</html>

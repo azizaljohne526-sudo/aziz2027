@@ -259,5 +259,26 @@
 
     }
   }
+function showRemainingDays() {
+  const expiry = Number(localStorage.getItem(EXPIRY_KEY));
+  if (!expiry || !isActivated()) return;
 
+  const days = Math.max(0, Math.ceil((expiry - Date.now()) / (24 * 60 * 60 * 1000)));
+
+  const box = document.createElement('div');
+  box.id = 'akRemainingDays';
+  box.textContent = 'الاشتراك: باقي ' + days + ' يوم';
+  box.style.cssText =
+    'position:fixed;bottom:10px;left:10px;z-index:99999;' +
+    'background:#0d2118;color:#58d68d;border:1px solid #28543e;' +
+    'padding:8px 12px;border-radius:10px;font-family:Arial,sans-serif;font-weight:bold;';
+
+  document.body.appendChild(box);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', showRemainingDays);
+} else {
+  showRemainingDays();
+}
 })();

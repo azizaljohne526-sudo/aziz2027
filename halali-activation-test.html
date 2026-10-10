@@ -1,0 +1,679 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1711"><title>حلالي — نسخة تجربة محلية</title><style>
+:root{--bg:#09140f;--panel:#122219;--line:#294936;--txt:#f2f5f3;--muted:#aab5ae;--green:#2fa052;--green2:#42b765;--red:#b53c3c}body.light{--bg:#f4f7f4;--panel:#fff;--line:#cfe0d4;--txt:#142018;--muted:#647268}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif}button,input,select,textarea{font:inherit}.app{max-width:1180px;margin:auto;padding:18px}.hero{background:var(--green);border-radius:28px;padding:24px;display:flex;justify-content:space-between;align-items:center}.hero h1{margin:0;font-size:36px}.hero p{margin:6px 0 0}.topbtn{border:0;border-radius:16px;padding:13px 17px;background:#ffffff20;color:#fff;font-size:22px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:16px 0}.stat,.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:18px}.stat b{display:block;color:var(--green2);font-size:30px;direction:ltr;text-align:right}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.nav{padding:24px 14px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--txt);font-weight:700;font-size:20px}.page{display:none}.page.active{display:block}.head{display:flex;align-items:center;justify-content:space-between;margin:16px 0}.back,.primary,.secondary,.danger{border:0;border-radius:14px;padding:12px 16px;color:#fff;font-weight:700}.back,.primary{background:var(--green)}.secondary{background:#24372d}.danger{background:#5b2626;color:#ffb2b2;border:1px solid #c78686}.form{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.form .full{grid-column:1/-1}label{display:block;color:var(--muted);font-size:14px;margin-bottom:5px}input,select,textarea{width:100%;background:transparent;color:var(--txt);border:1px solid var(--line);border-radius:14px;padding:13px}select option{color:#111}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.item{margin-top:12px}.item h3{margin:0 0 8px}.small{color:var(--muted);font-size:14px}.search{margin:12px 0}.filter{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.filter button{background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:9px 12px;border-radius:12px}.empty{text-align:center;color:var(--muted);padding:40px}.pill{display:inline-block;background:#153e24;color:#55c777;border-radius:999px;padding:5px 10px;font-size:13px}.money{direction:ltr;display:inline-block}.about{text-align:center;font-size:20px;line-height:2}.modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:20px;z-index:9}.modal.show{display:flex}.modal .card{width:min(700px,100%);max-height:90vh;overflow:auto}@media(max-width:760px){.app{padding:10px}.hero h1{font-size:28px}.stats{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:repeat(2,1fr)}.form{grid-template-columns:1fr}.nav{font-size:17px;padding:20px 8px}}
+</style></head><body><div class="app"><header class="hero"><div><h1>🐑 حلالي — تجربة</h1><p>إدارة ومتابعة الحلال</p></div><div><button class="topbtn" onclick="toggleTheme()">☀️ / 🌙</button></div></header><main id="home" class="page active"><div class="stats"><div class="stat"><b id="sHerd">0</b>عدد الحلال الحالي</div><div class="stat"><b id="sEwes">0</b>النعاج المنتجة</div><div class="stat"><b id="sBirths">0</b>المواليد الحالي</div><div class="stat"><b id="sAlerts">0</b>التنبيهات</div></div><div class="stats"><div class="stat"><b id="sSales">0</b>إجمالي البيع</div><div class="stat"><b id="sPurch">0</b>إجمالي المشتريات</div><div class="stat"><b id="sExp">0</b>إجمالي المصاريف</div><div class="stat"><b id="sProfit">0</b>الربح / الخسارة</div></div><div class="grid" id="nav"></div></main><section id="view" class="page"></section></div><div class="modal" id="modal"><div class="card" id="modalBody"></div></div><input type="file" id="restoreFile" accept="application/json" hidden><script>
+const K='halali-test-db-v2';const blank={ewes:[],births:[],deaths:[],purchases:[],expenses:[],sales:[],vaccines:[],inventory:[],treatments:[],notes:[],movements:[]};let db=Object.assign({},blank,JSON.parse(localStorage.getItem(K)||'{}'));let editing=null;const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));const id=()=>Date.now()+Math.random().toString(16).slice(2);const today=()=>new Date().toISOString().slice(0,10);const n=x=>Number(x)||0;const fmt=x=>new Intl.NumberFormat('en-US').format(n(x));function save(){localStorage.setItem(K,JSON.stringify(db));refresh()}function ensureIds(){['ewes','births','deaths','purchases','expenses','sales','vaccines','inventory','movements','treatments'].forEach(type=>{if(!Array.isArray(db[type]))db[type]=[];db[type].forEach(r=>{if(!r.id)r.id=id()})});localStorage.setItem(K,JSON.stringify(db))}function addMove(type,text){db.movements.unshift({id:id(),type,text,date:new Date().toISOString()})}function days(a,b=new Date()){return Math.floor((new Date(b)-new Date(a))/86400000)}function addMonths(ds,m){let d=new Date(ds);d.setMonth(d.getMonth()+m);return d.toISOString().slice(0,10)}function ageText(ds){let d=Math.max(0,days(ds));let y=Math.floor(d/360),r=d%360,mo=Math.floor(r/30),da=r%30;return [y?y+' سنة':'',mo?mo+' شهر':'',da||(!y&&!mo)?da+' يوم':''].filter(Boolean).join(' و ')}function money(x){return fmt(x)+' ريال'}
+function birthMix(type,custom='',manualCount=1){type=String(type||'');custom=String(custom||'').trim();if(type==='طلي')return{count:1,males:1,females:0};if(type==='رخلة')return{count:1,males:0,females:1};if(type==='طليان')return{count:2,males:2,females:0};if(type==='رخلتين')return{count:2,males:0,females:2};if(type==='طلي ورخلة')return{count:2,males:1,females:1};let males=0,females=0,txt=custom||type,m=txt.match(/(\d+)\s*(?:طلي|طليان)/),f=txt.match(/(\d+)\s*(?:رخلة|رخل|رخال)/);if(m)males=n(m[1]);if(f)females=n(f[1]);return{count:males+females||n(manualCount)||1,males,females}}
+function normalizeBirth(b){let m=birthMix(b.type,b.custom,b.count);return Object.assign({},b,{count:n(b.count)>1?n(b.count):m.count,males:b.males!=null?n(b.males):m.males,females:b.females!=null?n(b.females):m.females})}
+function birthTotals(){return db.births.reduce((a,x)=>{let b=normalizeBirth(x);a.count+=n(b.count);a.males+=n(b.males);a.females+=n(b.females);return a},{count:0,males:0,females:0})}function currentHerdCount(){let liveBirth=birthTotals().count-db.deaths.filter(x=>x.kind==='مولود').reduce((a,b)=>a+n(b.count),0);let eweDeaths=db.deaths.filter(x=>x.kind==='نعجة').reduce((a,b)=>a+n(b.count),0),eweSales=db.sales.filter(x=>x.type==='نعجة'&&x.source==='registered').reduce((a,b)=>a+n(b.count),0);let soldBirths=db.sales.filter(x=>x.source==='registered'&&['طلي','رخلة'].includes(x.type)).reduce((a,b)=>a+n(b.count),0);return Math.max(0,db.ewes.length+liveBirth-eweDeaths-eweSales-soldBirths)}
+function normalizeSaudiPhone(phone){let d=String(phone||'').replace(/\D/g,'');if(d.startsWith('00966'))d=d.slice(2);if(d.startsWith('9660'))d='966'+d.slice(4);else if(d.startsWith('05'))d='966'+d.slice(1);else if(d.startsWith('5')&&d.length===9)d='966'+d;return d}
+const pages=[['herd','🐑 سجل القطيع'],['births','👶 المواليد'],['deaths','☠️ النفوق'],['purchases','🛒 المشتريات'],['expenses','💰 المصاريف'],['sales','💵 البيع'],['vaccines','💉 التطعيمات'],['eweReport','📋 تقرير النعاج'],['inventory','📦 جرد الحلال'],['birthReport','📊 تقرير المواليد'],['allReports','📑 تقارير الفترات'],['production','🏆 إنتاج النعاج'],['alerts','🔔 التنبيهات'],['season','📅 موسم الولادات'],['profit','📈 الربح والخسارة'],['summary','📋 الملخص'],['movement','🕘 سجل الحركة'],['backup','💾 النسخة الاحتياطية'],['buyers','👥 سجل المشترين'],['treatments','💊 سجل العلاجات'],['about','👤 نبذة عن صاحب البرنامج']];$('#nav').innerHTML=pages.map(p=>`<button class="nav" onclick="openPage('${p[0]}')">${p[1]}</button>`).join('');
+function refresh(){let liveBirth=birthTotals().count-db.deaths.filter(x=>x.kind==='مولود').reduce((a,b)=>a+n(b.count),0);let eweDeaths=db.deaths.filter(x=>x.kind==='نعجة').reduce((a,b)=>a+n(b.count),0),eweSales=db.sales.filter(x=>x.type==='نعجة'&&x.source==='registered').reduce((a,b)=>a+n(b.count),0);let herd=currentHerdCount();let sales=db.sales.reduce((a,b)=>a+n(b.total),0),pur=db.purchases.reduce((a,b)=>a+n(b.total),0),exp=db.expenses.reduce((a,b)=>a+n(b.amount),0);$('#sHerd').textContent=fmt(herd);$('#sEwes').textContent=fmt(db.ewes.length);$('#sBirths').textContent=fmt(Math.max(0,liveBirth));$('#sAlerts').textContent=fmt(alertData().length);$('#sSales').textContent=fmt(sales);$('#sPurch').textContent=fmt(pur);$('#sExp').textContent=fmt(exp);$('#sProfit').textContent=fmt(sales-pur-exp)}
+function shell(title,body){$('#home').classList.remove('active');$('#view').classList.add('active');$('#view').innerHTML=`<div class="head"><h2>${title}</h2><button class="back" onclick="home()">⬅️ الرجوع للرئيسية</button></div>${body}`}function home(){$('#view').classList.remove('active');$('#home').classList.add('active');refresh()}function card(x){return `<div class="card item">${x}</div>`}function btns(type,r){return `<div class="actions"><button type="button" class="secondary js-edit" data-type="${esc(type)}" data-id="${esc(r.id)}">✏️ تعديل</button><button type="button" class="danger js-delete" data-type="${esc(type)}" data-id="${esc(r.id)}">🗑️ حذف</button></div>`}function formOpen(title,html,onSave){$('#modalBody').innerHTML=`<h2>${title}</h2><form id="f">${html}<div class="actions"><button class="primary">💾 حفظ</button><button type="button" class="secondary" onclick="closeModal()">إلغاء</button></div></form>`;$('#modal').classList.add('show');$('#f').onsubmit=e=>{e.preventDefault();const result=onSave(new FormData(e.target));if(result!==false)closeModal()}}function closeModal(){$('#modal').classList.remove('show');editing=null}
+function openPage(p){({herd,births,deaths,purchases,expenses,sales,vaccines,eweReport,inventory,birthReport,allReports,production,alerts,season,profit,summary,movement,backup,buyers,treatments,about}[p])()}
+function eweAgeText(e){let base=n(e.ageMonths||0)*30;let elapsed=e.regDate?Math.max(0,days(e.regDate)):0;let total=base+elapsed;let years=Math.floor(total/360),months=Math.floor(total%360/30),remaining=total%30;return [years?years+' سنة':'',months?months+' شهر':'',remaining?remaining+' يوم':''].filter(Boolean).join(' و ')||'غير محدد'}
+function herd(){shell('🐑 سجل القطيع',`<div class="stats"><div class="stat"><b>${fmt(db.ewes.length)}</b>عدد النعاج</div><div class="stat"><b>${fmt(db.ewes.filter(e=>e.lastBirth).length)}</b>والدة</div><div class="stat"><b>${fmt(db.ewes.filter(e=>e.lastBirth&&days(addMonths(e.lastBirth,7))>0).length)}</b>متأخرة</div></div><button class="primary" onclick="eweForm()">➕ إضافة نعجة</button><input class="search" placeholder="🔎 بحث برقم النعجة" oninput="filterCards(this.value)"><div id="cards">${db.ewes.map(e=>card(`<h3>النعجة رقم ${esc(e.no)}</h3><div>العمر: ${eweAgeText(e)} — الحالة: ${esc(e.status)}</div><div>تاريخ التسجيل: ${e.regDate} — آخر ولادة: ${e.lastBirth||'—'}</div>${btns('ewes',e)}`)).join('')||'<div class="empty">لا توجد نعاج</div>'}</div>`)}
+function eweForm(r={}){let opts=[...Array.from({length:11},(_,i)=>({v:i+1,t:(i+1)+' شهر'})),...Array.from({length:10},(_,i)=>({v:(i+1)*12,t:(i+1)+' '+((i+1)===1?'سنة':(i+1)===2?'سنتين':'سنوات')}))].map(o=>`<option value="${o.v}" ${n(r.ageMonths||1)===o.v?'selected':''}>${o.t}</option>`).join('');formOpen(r.id?'تعديل نعجة':'إضافة نعجة',`<label>رقم النعجة</label><input name="no" required value="${esc(r.no||'')}"><label>العمر عند التسجيل (بالشهور أو السنوات)</label><select name="ageMonths">${opts}</select><label>الحالة</label><select name="status"><option>جيدة</option><option ${r.status==='تعبانة'?'selected':''}>تعبانة</option></select><label>تاريخ التسجيل</label><input type="date" name="regDate" required value="${r.regDate||today()}"><label>تاريخ آخر ولادة</label><input type="date" name="lastBirth" value="${r.lastBirth||''}">`,f=>{let o=Object.fromEntries(f);if(db.ewes.some(x=>x.no===o.no&&x.id!==r.id))return alert('رقم النعجة موجود مسبقًا');o.id=r.id||id();db.ewes=r.id?db.ewes.map(x=>x.id===r.id?o:x):[o,...db.ewes];addMove('نعجة',(r.id?'تعديل':'إضافة')+' النعجة '+o.no);save();herd()})}
+function births(){shell('👶 المواليد',`<button class="primary" onclick="birthForm()">➕ إضافة مولود</button><div>${db.births.map(raw=>{let b=normalizeBirth(raw);return card(`<h3>الأم ${esc(b.mother)} — ${esc(b.custom||b.type)}</h3><div>التاريخ: ${b.date} — العدد: ${fmt(b.count)} — طليان: ${fmt(b.males)} — رخال: ${fmt(b.females)} — العمر: ${ageText(b.date)}</div>${btns('births',b)}`)}).join('')||'<div class="empty">لا توجد مواليد</div>'}</div>`)}
+function birthForm(r={}){
+  let selected=r.type||'طلي';
+
+  formOpen(r.id?'تعديل مولود':'إضافة مولود',`
+    <label>رقم الأم</label>
+    <input name="mother" required value="${esc(r.mother||'')}">
+
+    <label>نوع المواليد</label>
+    <select name="type" id="birthType" onchange="birthOtherToggle()">
+      ${['طلي','رخلة','طليان','رخلتين','طلي ورخلة','أخرى']
+        .map(x=>`<option ${selected===x?'selected':''}>${x}</option>`)
+        .join('')}
+    </select>
+
+    <div id="birthOther" style="display:${selected==='أخرى'?'block':'none'}">
+      <label>وش جابت الأم؟</label>
+      <input name="custom" placeholder="اكتب هنا: 2 طلي و1 رخلة" value="${esc(r.custom||'')}">
+
+      <label>عدد الطليان</label>
+      <input type="number" min="0" name="customMales"
+        value="${r.type==='أخرى'?(r.males||0):0}">
+
+      <label>عدد الرخال</label>
+      <input type="number" min="0" name="customFemales"
+        value="${r.type==='أخرى'?(r.females||0):0}">
+    </div>
+
+    <label>التاريخ</label>
+    <input type="date" name="date" required value="${r.date||today()}">
+  `,f=>{
+    let o=Object.fromEntries(f);
+
+    let mix=o.type==='أخرى'
+      ?{
+          males:n(o.customMales),
+          females:n(o.customFemales),
+          count:n(o.customMales)+n(o.customFemales)
+        }
+      :birthMix(o.type,o.custom,1);
+
+    if(o.type==='أخرى'&&mix.count<1){
+      alert('اكتب عدد الطليان أو الرخال');
+      return;
+    }
+
+    o.id=r.id||id();
+    o.count=mix.count;
+    o.males=mix.males;
+    o.females=mix.females;
+
+    o.custom=o.type==='أخرى'
+      ?(o.custom||(
+        (mix.males?mix.males+' طليان ':'')+
+        (mix.females?mix.females+' رخال':'')
+      ))
+      :'';
+
+    delete o.customMales;
+    delete o.customFemales;
+
+    // كل ولادة تحفظ كسجل مستقل
+    db.births=r.id
+      ?db.births.map(x=>x.id===r.id?o:x)
+      :[o,...db.births];
+
+    let e=db.ewes.find(x=>x.no===o.mother);
+    if(e)e.lastBirth=o.date;
+
+    addMove(
+      'مواليد',
+      (r.id?'تعديل':'إضافة')+
+      ' مواليد للأم '+o.mother+
+      ' عدد '+o.count
+    );
+
+    save();
+    births();
+  })
+}
+function birthOtherToggle(){let s=$('#birthType'),d=$('#birthOther');if(s&&d)d.style.display=s.value==='أخرى'?'block':'none'}
+function deaths(){
+  shell('☠️ النفوق',
+  `<button class="primary" onclick="deathForm()">➕ إضافة نفوق</button>
+  ${db.deaths.map(d=>card(`
+    <h3>${esc(d.kind)} — العدد ${fmt(d.count)}</h3>
+    <div>
+      ${d.kind==='مولود'
+        ?'الأم: '+esc(d.mother||'—')+' — النوع: '+esc(d.childType==='أخرى'?(d.childOther||'أخرى'):(d.childType||'—'))
+        :'رقم الحيوان: '+esc(d.animalNo||'—')}
+    </div>
+    <div>التاريخ: ${d.date}</div>
+    ${btns('deaths',d)}
+  `)).join('')||'<div class="empty">لا يوجد نفوق</div>'}`)
+}
+
+function deathForm(r={}){
+  formOpen(r.id?'تعديل نفوق':'إضافة نفوق',`
+    <label>النوع</label>
+    <select name="kind" onchange="
+      this.form.querySelector('.baby').style.display=this.value==='مولود'?'block':'none'
+    ">
+      <option ${r.kind==='نعجة'?'selected':''}>نعجة</option>
+      <option ${r.kind==='طلي'?'selected':''}>طلي</option>
+      <option ${r.kind==='رخلة'?'selected':''}>رخلة</option>
+      <option ${r.kind==='فحل'?'selected':''}>فحل</option>
+      <option ${r.kind==='مولود'?'selected':''}>مولود</option>
+    </select>
+
+    <div class="baby" style="display:${r.kind==='مولود'?'block':'none'}">
+      <label>رقم الأم</label>
+      <input name="mother" value="${esc(r.mother||'')}">
+
+      <label>وش اللي مات لها</label>
+      <select name="childType" onchange="
+        this.form.querySelector('.deathOther').style.display=this.value==='أخرى'?'block':'none'
+      ">
+        <option ${r.childType==='طلي'?'selected':''}>طلي</option>
+        <option ${r.childType==='رخلة'?'selected':''}>رخلة</option>
+        <option ${r.childType==='طليان'?'selected':''}>طليان</option>
+        <option ${r.childType==='رخلتين'?'selected':''}>رخلتين</option>
+        <option ${r.childType==='طلي ورخلة'?'selected':''}>طلي ورخلة</option>
+        <option ${r.childType==='أخرى'?'selected':''}>أخرى</option>
+      </select>
+
+      <div class="deathOther" style="display:${r.childType==='أخرى'?'block':'none'}">
+        <label>اكتب وش المتوفي</label>
+        <input name="childOther" value="${esc(r.childOther||'')}" placeholder="اكتب النوع">
+      </div>
+    </div>
+
+    <label>رقم الحيوان (اختياري)</label>
+    <input name="animalNo" value="${esc(r.animalNo||'')}">
+
+    <label>العدد</label>
+    <input type="number" min="1" name="count" value="${r.count||1}">
+
+    <label>التاريخ</label>
+    <input type="date" name="date" value="${r.date||today()}">
+  `,f=>{
+    let o=Object.fromEntries(f);
+
+    if(o.kind==='مولود'){
+      if(o.childType==='طلي ورخلة') o.count=2;
+      else if(o.childType==='طليان') o.count=2;
+      else if(o.childType==='رخلتين') o.count=2;
+    }
+
+    o.id=r.id||id();
+
+    db.deaths=r.id
+      ?db.deaths.map(x=>x.id===r.id?o:x)
+      :[o,...db.deaths];
+
+    addMove('نفوق',(r.id?'تعديل':'إضافة')+' نفوق '+o.kind);
+    save();
+    deaths();
+  })
+}
+const purchaseTypes=['علف','شعير','مكعبات','خبز','شبوك','معالف','موية','أخرى'];function purchases(){listMoney('🛒 المشتريات','purchases','إضافة مشتريات',purchaseTypes)}function expenses(){listMoney('💰 المصاريف','expenses','إضافة مصروف',['علاج','راتب العامل','بيطري','نقل','صيانة','كهرباء','وقود','أخرى'])}function listMoney(title,type,label,types){let arr=db[type];shell(title,`<div class="stats"><div class="stat"><b>${fmt(arr.reduce((a,b)=>a+n(b.total||b.amount),0))}</b>الإجمالي</div><div class="stat"><b>${fmt(arr.length)}</b>عدد العمليات</div></div><button class="primary" onclick="moneyForm('${type}')">➕ ${label}</button>${arr.map(r=>card(`<h3>${esc(r.type)}</h3><div>${r.qty?'الكمية: '+fmt(r.qty)+' — سعر الوحدة: '+money(r.price)+' — ':''}الإجمالي: ${money(r.total||r.amount)}</div><div>${r.date}</div>${btns(type,r)}`)).join('')||'<div class="empty">لا توجد سجلات</div>'}`)}function moneyForm(type,r={}){let types=type==='purchases'?purchaseTypes:['علاج','راتب العامل','بيطري','نقل','صيانة','كهرباء','وقود','أخرى'];formOpen(r.id?'تعديل':'إضافة',`<label>النوع</label><select name="type">${types.map(x=>`<option ${r.type===x?'selected':''}>${x}</option>`).join('')}</select>${type==='purchases'?`<label>الكمية</label><input type="number" step="any" name="qty" value="${r.qty||''}"><label>سعر الوحدة</label><input type="number" step="any" name="price" value="${r.price||''}">`:`<label>المبلغ</label><input type="number" step="any" name="amount" value="${r.amount||''}">`}<label>التاريخ</label><input type="date" name="date" value="${r.date||today()}"><label>ملاحظة</label><input name="note" value="${esc(r.note||'')}">`,f=>{let o=Object.fromEntries(f);o.id=r.id||id();if(type==='purchases')o.total=n(o.qty)*n(o.price);db[type]=r.id?db[type].map(x=>x.id===r.id?o:x):[o,...db[type]];addMove(type==='purchases'?'مشتريات':'مصاريف',(r.id?'تعديل ':'إضافة ')+o.type);save();listMoney(type==='purchases'?'🛒 المشتريات':'💰 المصاريف',type,'',types)})}
+function sales(){shell('💵 البيع',`<div class="stats"><div class="stat"><b>${fmt(db.sales.reduce((a,b)=>a+n(b.total),0))}</b>إجمالي المبيعات</div><div class="stat"><b>${fmt(db.sales.reduce((a,b)=>a+n(b.count),0))}</b>الرؤوس المباعة</div></div><button class="primary" onclick="saleForm()">➕ إضافة بيع</button>${db.sales.map(r=>card(`<h3>${esc(r.type)} × ${fmt(r.count)}</h3><div>المصدر: ${r.source==='registered'?'من الحلال المسجل':r.source==='external'?'من خارج السجل':'عملية قديمة — راجع المصدر'} — المشتري: ${esc(r.buyer||'غير مسجل')} — الإجمالي: ${money(r.total)}</div><div>${r.date}</div>${btns('sales',r)}`)).join('')||'<div class="empty">لا توجد مبيعات</div>'}`)}
+function saleForm(r={}){
+  formOpen(r.id?'تعديل بيع':'إضافة بيع',`
+    <label>مصدر الحلال المباع</label>
+    <select name="source" required>
+      <option value="registered" ${r.source==='registered'?'selected':''}>من الحلال المسجل — يخصم من العدد</option>
+      <option value="external" ${r.source==='external'||!r.source?'selected':''}>من خارج القطيع — يسجل البيع ولا يخصم</option>
+    </select>
+    <p class="small">إذا بعت حلالًا من خارج القطيع، اختر «من خارج القطيع». لا يحتاج رقمًا في سجل النعاج.</p>
+    <label>النوع</label><select name="type">${['طلي','رخلة','نعجة','فحل'].map(t=>`<option ${r.type===t?'selected':''}>${t}</option>`).join('')}</select>
+    <label>العدد</label><input type="number" min="1" step="1" name="count" required value="${r.count||1}">
+    <label>رقم الحيوان (اختياري للبيع الخارجي)</label><input name="animalNo" value="${esc(r.animalNo||'')}">
+    <label>سعر الواحد</label><input type="number" min="0" step="0.01" name="price" required value="${r.price??''}">
+    <label>اسم المشتري</label><input name="buyer" value="${esc(r.buyer||'')}">
+    <label>الجوال</label><input name="phone" value="${esc(r.phone||'')}">
+    <label>التاريخ</label><input type="date" name="date" required value="${r.date||today()}">
+  `,f=>{
+    let o=Object.fromEntries(f);
+    if(!['registered','external'].includes(o.source)){alert('اختر مصدر البيع');return false}
+    if(!Number.isInteger(Number(o.count))||Number(o.count)<1){alert('أدخل عددًا صحيحًا أكبر من صفر');return false}
+    if(o.price.trim()===''||!Number.isFinite(Number(o.price))||Number(o.price)<0){alert('أدخل سعر الواحد بشكل صحيح');return false}
+    if(o.source==='registered'&&o.type==='نعجة'){
+      if(!o.animalNo.trim()){alert('أدخل رقم النعجة المسجلة');return false}
+      if(!db.ewes.some(e=>String(e.no)===String(o.animalNo))){alert('رقم النعجة غير موجود في السجل');return false}
+      if(db.sales.some(x=>x.id!==r.id&&x.source==='registered'&&x.type==='نعجة'&&String(x.animalNo)===String(o.animalNo))){alert('هذه النعجة مسجلة كمباعة من قبل');return false}
+    }
+    o.id=r.id||id();o.count=Number(o.count);o.price=Number(o.price);o.total=o.count*o.price;
+    db.sales=r.id?db.sales.map(x=>x.id===r.id?o:x):[o,...db.sales];
+    addMove('بيع',(r.id?'تعديل':'إضافة')+' بيع '+o.type+' — '+(o.source==='external'?'من خارج القطيع':'من القطيع المسجل'));
+    save();sales();
+    return true;
+  })
+}
+function vaccines(){
+  shell('💉 التطعيمات',
+  `<button class="primary" onclick="vaccineForm()">➕ إضافة تطعيم</button>
+  ${db.vaccines.map(r=>{
+    let next=addMonths(r.date,r.type==='دود'?3:6);
+    let left=-days(next);
+
+    let status=
+      left>0 ? `باقي ${fmt(left)} يوم` :
+      left===0 ? `موعد التطعيم اليوم` :
+      `متأخر ${fmt(Math.abs(left))} يوم`;
+
+    return card(`
+      <h3>${esc(r.type)} 💉</h3>
+      <div>الفئة: ${esc(r.group)} — الحيوان: ${esc(r.animalNo||'الكل')}</div>
+      <div>التاريخ: ${r.date} — القادم: ${next} — ${status}</div>
+      ${btns('vaccines',r)}
+    `)
+  }).join('')||'<div class="empty">لا توجد تطعيمات</div>'}`)
+}
+  function vaccineForm(r={}){
+  formOpen(r.id?'تعديل تطعيم':'إضافة تطعيم',`
+    <label>الفئة</label>
+    <select name="group">
+      <option ${r.group==='الحلال كله'?'selected':''}>الحلال كله</option>
+      <option ${r.group==='الطليان'?'selected':''}>الطليان</option>
+      <option ${r.group==='الرخال'?'selected':''}>الرخال</option>
+      <option ${r.group==='النعاج'?'selected':''}>النعاج</option>
+      <option ${r.group==='طلي'?'selected':''}>طلي</option>
+      <option ${r.group==='رخلة'?'selected':''}>رخلة</option>
+      <option ${r.group==='نعجة'?'selected':''}>نعجة</option>
+    </select>
+
+    <label>نوع التطعيم</label>
+    <select name="type">
+      <option ${r.type==='هويجر'?'selected':''}>هويجر</option>
+      <option ${r.type==='دموي'?'selected':''}>دموي</option>
+      <option ${r.type==='معوي'?'selected':''}>معوي</option>
+      <option ${r.type==='طاعون'?'selected':''}>طاعون</option>
+      <option ${r.type==='جدري'?'selected':''}>جدري</option>
+      <option ${r.type==='دود'?'selected':''}>دود</option>
+      <option ${r.type==='أخرى'?'selected':''}>أخرى</option>
+    </select>
+
+    <label>رقم الحيوان إن كان فرديًا</label>
+    <input name="animalNo" value="${esc(r.animalNo||'')}">
+
+    <label>التاريخ</label>
+    <input type="date" name="date" value="${r.date||today()}">
+
+    <label>ملاحظة</label>
+    <input name="note" value="${esc(r.note||'')}">
+  `,f=>{
+    let o=Object.fromEntries(f);
+    o.id=r.id||id();
+
+    db.vaccines=r.id
+      ?db.vaccines.map(x=>x.id===r.id?o:x)
+      :[o,...db.vaccines];
+
+    addMove('تطعيم',(r.id?'تعديل':'إضافة')+' '+o.type);
+    save();
+    vaccines();
+  })
+}
+function eweStats(e){let no=String(e.no||e.mother||''),bs=db.births.filter(b=>String(b.mother)===no).map(normalizeBirth),born=bs.reduce((a,b)=>a+n(b.count),0),dead=db.deaths.filter(d=>d.kind==='مولود'&&String(d.mother)===no).reduce((a,b)=>a+n(b.count),0),lastBirth=bs.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]?.date||e.lastBirth||'';return{bs,born,dead,live:Math.max(0,born-dead),last:lastBirth,next:lastBirth?addMonths(lastBirth,6):''}}
+function reportMothers(){let map=new Map();db.ewes.forEach(e=>map.set(String(e.no),e));db.births.forEach(b=>{let k=String(b.mother||'');if(k&&!map.has(k))map.set(k,{id:'report-'+k,no:k,status:'—',regDate:'',lastBirth:b.date,_reportOnly:true})});return [...map.values()]}
+function eweReport(){
+  let rows=reportMothers();
+
+  shell('📋 تقرير النعاج',`
+    <input class="search" placeholder="🔎 بحث برقم النعجة" oninput="filterCards(this.value)">
+    <div id="cards">
+      ${rows.map(e=>{
+        let s=eweStats(e);
+
+        let births=s.bs.map(normalizeBirth);
+
+        let males=births.reduce((a,b)=>a+n(b.males),0);
+        let females=births.reduce((a,b)=>a+n(b.females),0);
+
+        let deaths=db.deaths.filter(d=>
+          d.kind==='مولود' &&
+          String(d.mother)===String(e.no)
+        );
+
+        let deadM=deaths.reduce((a,d)=>{
+          if(d.childType==='طلي'||d.childType==='طليان')
+            return a+n(d.count);
+          if(d.childType==='طلي ورخلة')
+            return a+1;
+          return a;
+        },0);
+
+        let deadF=deaths.reduce((a,d)=>{
+          if(d.childType==='رخلة'||d.childType==='رخلتين')
+            return a+n(d.count);
+          if(d.childType==='طلي ورخلة')
+            return a+1;
+          return a;
+        },0);
+
+        let liveM=Math.max(0,males-deadM);
+        let liveF=Math.max(0,females-deadF);
+        let live=liveM+liveF;
+
+        let deathText=deaths.length
+          ?deaths.map(d=>{
+              let type=d.childType==='أخرى'
+                ?(d.childOther||'أخرى')
+                :(d.childType||'—');
+              return `${esc(type)} ${fmt(d.count||1)}`;
+            }).join(' | ')
+          :'لا يوجد';
+
+        let history=births
+          .slice()
+          .sort((a,b)=>String(a.date).localeCompare(String(b.date)))
+          .map((b,i)=>{
+            let what=b.type==='أخرى'
+              ?(b.custom||`${n(b.males)} طليان و ${n(b.females)} رخال`)
+              :(b.type||'—');
+
+            return `
+              <div style="margin-top:8px;padding:8px;border-top:1px solid var(--line)">
+                <b>الولادة ${fmt(i+1)}</b><br>
+                التاريخ: ${esc(b.date||'—')}<br>
+                جابت: ${esc(what)}
+              </div>
+            `;
+          }).join('');
+
+        return card(`
+          <h3>🐑 النعجة رقم ${esc(e.no)}</h3>
+
+          <div>
+            ${e.regDate?'العمر: '+eweAgeText(e)+' — ':''}
+            الحالة: ${esc(e.status||'—')}
+          </div>
+
+          <div>
+            الولادات: ${fmt(births.length)}
+            — إجمالي المواليد: ${fmt(males+females)}
+            — نفوق: ${fmt(deadM+deadF)}
+            — المواليد الحية: ${fmt(live)}
+          </div>
+
+          <div>
+            <b>الحي:</b>
+            طليان ${fmt(liveM)} — رخال ${fmt(liveF)}
+          </div>
+
+          <div>
+            <b>النفوق:</b> ${deathText}
+          </div>
+
+          <div>
+            آخر ولادة: ${s.last||'—'}
+            — القادمة: ${s.next||'—'}
+            ${s.next?'— باقي '+fmt(-days(s.next))+' يوم':''}
+          </div>
+
+          ${history}
+
+          ${e._reportOnly?'':btns('ewes',e)}
+        `);
+      }).join('')||'<div class="empty">لا توجد بيانات</div>'}
+    </div>
+  `);
+}
+function inventory(){let system=currentHerdCount();shell('📦 جرد الحلال',`<button class="primary" onclick="inventoryForm()">➕ جرد جديد</button><p class="small">الجرد للمقارنة فقط ولا يغيّر عدد الحلال. عدد الحلال بالنظام الآن: <b>${fmt(system)}</b></p>${db.inventory.map(r=>{let total=n(r.ewes)+n(r.rams)+n(r.lambs)+n(r.females),diff=total-system,msg=diff>0?'🟢 زيادة '+fmt(diff):diff<0?'🔴 نقص '+fmt(Math.abs(diff)):'✅ مطابق';return card(`<h3>📦 جرد ${fmt(total)} رأس</h3><div>نعاج ${fmt(r.ewes)} — فحول ${fmt(r.rams)} — طليان ${fmt(r.lambs)} — رخال ${fmt(r.females)}</div><div>عدد الحلال بالنظام: ${fmt(system)} — <b>${msg}</b></div><div>${r.date}</div>${btns('inventory',r)}`)}).join('')||'<div class="empty">لا يوجد جرد</div>'}`)}function inventoryForm(r={}){formOpen(r.id?'تعديل الجرد':'جرد جديد',`<label>عدد النعاج</label><input type="number" name="ewes" value="${r.ewes||0}"><label>عدد الفحول</label><input type="number" name="rams" value="${r.rams||0}"><label>عدد الطليان</label><input type="number" name="lambs" value="${r.lambs||0}"><label>عدد الرخال</label><input type="number" name="females" value="${r.females||0}"><label>تاريخ الجرد</label><input type="date" name="date" value="${r.date||today()}"><label>ملاحظة</label><input name="note" value="${esc(r.note||'')}">`,f=>{let o=Object.fromEntries(f);o.id=r.id||id();db.inventory=r.id?db.inventory.map(x=>x.id===r.id?o:x):[o,...db.inventory];addMove('جرد',(r.id?'تعديل':'إضافة')+' جرد');save();inventory()})}
+function birthReport(months=0){shell('📊 تقرير المواليد',periodButtons('birthReport',months)+reportBirthBody(months))}function production(months=0){let rows=reportMothers();shell('🏆 إنتاج النعاج',periodButtons('production',months)+rows.map(e=>{let s=eweStats(e),bs=s.bs.filter(b=>inPeriod(b,months));if(months&&!bs.length)return '';let born=bs.reduce((a,b)=>a+n(normalizeBirth(b).count),0),dead=db.deaths.filter(d=>d.kind==='مولود'&&String(d.mother)===String(e.no)&&inPeriod(d,months)).reduce((a,b)=>a+n(b.count),0),types=bs.map(b=>esc(b.custom||b.type)).filter(Boolean).join(' | ');return card(`<h3>🏆 النعجة ${esc(e.no)}</h3><div>الولادات: ${fmt(bs.length)} — إجمالي المواليد: ${fmt(born)} — النفوق: ${fmt(dead)} — الحية: ${fmt(Math.max(0,born-dead))}</div><div>نوع المواليد: ${types||'—'}</div>${e._reportOnly?'':btns('ewes',e)}`)}).join('')||'<div class="empty">لا توجد بيانات</div>')}
+function reportBirthBody(months=0){
+  let periodBirths=db.births.filter(b=>inPeriod(b,months));
+  let t=periodBirths.reduce((a,x)=>{let b=normalizeBirth(x);a.count+=n(b.count);a.males+=n(b.males);a.females+=n(b.females);return a},{count:0,males:0,females:0});
+
+  let validDeaths=db.deaths.filter(d=>{
+    if(d.kind!=='مولود'||!inPeriod(d,months)) return false;
+
+    let births=periodBirths
+      .filter(b=>String(b.mother)===String(d.mother))
+      .map(normalizeBirth)
+      .filter(b=>b.date && String(b.date)<=String(d.date));
+
+    return births.length>0;
+  });
+
+  let deadM=validDeaths.reduce((a,d)=>{
+    if(d.childType==='طلي'||d.childType==='طليان') return a+n(d.count);
+    if(d.childType==='طلي ورخلة') return a+1;
+    return a;
+  },0);
+
+  let deadF=validDeaths.reduce((a,d)=>{
+    if(d.childType==='رخلة'||d.childType==='رخلتين') return a+n(d.count);
+    if(d.childType==='طلي ورخلة') return a+1;
+    return a;
+  },0);
+
+  return `
+    <div class="stats">
+      <div class="stat"><b>${fmt(Math.max(0,t.count-deadM-deadF))}</b>إجمالي المواليد الحالي</div>
+      <div class="stat"><b>${fmt(Math.max(0,t.males-deadM))}</b>عدد الطليان</div>
+      <div class="stat"><b>${fmt(Math.max(0,t.females-deadF))}</b>عدد الرخال</div>
+    </div>
+
+    ${reportMothers().map(e=>{
+      let x=eweStats(e);
+
+      let births=x.bs.filter(b=>inPeriod(b,months))
+        .slice()
+        .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+
+      let m=births.reduce((a,b)=>a+n(b.males),0);
+      let f=births.reduce((a,b)=>a+n(b.females),0);
+
+      let lastBirth=births.slice()
+        .sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
+
+      let lastBirthDate=lastBirth?.date||'';
+
+      let ds=db.deaths.filter(d=>
+        inPeriod(d,months) && d.kind==='مولود' &&
+        String(d.mother)===String(e.no) &&
+        lastBirthDate &&
+        String(d.date)>=String(lastBirthDate)
+      );
+
+      let dm=ds.reduce((a,d)=>{
+        if(d.childType==='طلي'||d.childType==='طليان') return a+n(d.count);
+        if(d.childType==='طلي ورخلة') return a+1;
+        return a;
+      },0);
+
+      let df=ds.reduce((a,d)=>{
+        if(d.childType==='رخلة'||d.childType==='رخلتين') return a+n(d.count);
+        if(d.childType==='طلي ورخلة') return a+1;
+        return a;
+      },0);
+
+      let liveM=Math.max(0,m-dm);
+      let liveF=Math.max(0,f-df);
+      let live=liveM+liveF;
+
+      let ages=births.map(b=>{
+        if(!b.date) return '';
+        return ageText(b.date);
+      }).filter(Boolean).join(' - ');
+
+      let birthHistory=births.map((b,i)=>{
+  let what=b.type==='أخرى'
+    ?(b.custom||`${n(b.males)} طليان و ${n(b.females)} رخال`)
+    :(b.type||'—');
+
+  return `
+    <div style="margin-top:8px;padding:8px;border-top:1px solid var(--line)">
+      <b>الولادة ${fmt(i+1)}</b><br>
+      التاريخ: ${esc(b.date||'—')}<br>
+      جابت: ${esc(what)}
+    </div>
+  `;
+}).join('');
+
+
+      if(months&&!births.length)return '';
+      return card(`
+        <h3>الأم ${esc(e.no)}</h3>
+
+        <div>
+          عدد الولادات: ${fmt(births.length)}
+          — المواليد الحية: ${fmt(live)}
+          — طليان: ${fmt(liveM)}
+          — رخال: ${fmt(liveF)}
+        </div>
+
+        ${live>0&&ages?`<div>العمر: ${esc(ages)}</div>`:''}
+
+        ${birthHistory}
+
+        ${btns('ewes',e)}
+      `);
+    }).join('')}
+  `;
+}
+
+function alertData(){
+  let a=[];
+  // عرض جميع الأمهات المعروفة، حتى لو كانت ولادتها مسجلة دون سجل قطيع.
+  reportMothers().forEach(e=>{
+    const info=eweStats(e);
+    if(!info.last)return;
+    const target=addMonths(info.last,6);
+    const left=-days(target);
+    if(left<=30){
+      const type=left<0?'متأخرة':left===0?'موعد الولادة اليوم':'قرب الولادة';
+      const status=left<0?'متأخرة '+fmt(Math.abs(left))+' يوم':left===0?'موعد الولادة اليوم':'باقي '+fmt(left)+' يوم';
+      a.push({type,animalNo:String(e.no),text:String(e.no)+' — '+status+' — الموعد المتوقع: '+target});
+    }
+  });
+
+  db.vaccines.forEach(v=>{
+    let next=addMonths(v.date,v.type==='دود'?3:6),left=-days(next);
+    if(left<=7){
+      let status=left>0?'باقي '+fmt(left)+' يوم':left===0?'موعد التطعيم اليوم':'متأخر '+fmt(Math.abs(left))+' يوم';
+      a.push({type:'تطعيم',text:v.type+' — '+status});
+    }
+  });
+  return a;
+}
+
+function alerts(){
+  const all=alertData();
+  const late=all.filter(x=>x.type==='متأخرة');
+  const near=all.filter(x=>x.type==='قرب الولادة');
+  const todayDue=all.filter(x=>x.type==='موعد الولادة اليوم');
+  const vaccines=all.filter(x=>x.type==='تطعيم');
+  const eweCard=(x)=>card(`<h3 style="font-size:25px;color:var(--green2)">🐑 رقم النعجة: <span dir="ltr">${esc(x.animalNo||'غير مسجل')}</span></h3><div style="font-size:19px;font-weight:bold;margin:8px 0">${esc(x.text.split(' — ')[1]||x.type)}</div><div class="small">${esc(x.text.split(' — ').slice(2).join(' — '))}</div>`);
+  shell('🔔 التنبيهات',`
+    <div class="stats">
+      <div class="stat"><b>${fmt(late.length)}</b>النعاج المتأخرة</div>
+      <div class="stat"><b>${fmt(near.length)}</b>النعاج القريبة</div>
+      <div class="stat"><b>${fmt(todayDue.length)}</b>موعدها اليوم</div>
+      <div class="stat"><b>${fmt(vaccines.length)}</b>التطعيمات</div>
+    </div>
+    <h3>🔴 النعاج المتأخرة — أرقامها</h3>
+    ${late.map(eweCard).join('')||'<div class="empty">لا توجد نعاج متأخرة</div>'}
+    <h3>🟢 النعاج القريبة من الولادة — أرقامها</h3>
+    ${near.map(eweCard).join('')||'<div class="empty">لا توجد نعاج قريبة</div>'}
+    <h3>📅 موعد ولادتها اليوم — أرقامها</h3>
+    ${todayDue.map(eweCard).join('')||'<div class="empty">لا توجد نعاج موعدها اليوم</div>'}
+    <h3>💉 تنبيهات التطعيمات</h3>
+    ${vaccines.map(x=>card(`<h3>${esc(x.type)}</h3><div>${esc(x.text)}</div>`)).join('')||'<div class="empty">لا توجد تنبيهات تطعيم</div>'}
+  `);
+}
+
+function season(){
+  let rows=reportMothers().map(e=>({e,s:eweStats(e)})).filter(x=>x.s.last);
+  shell('📅 موسم الولادات',`
+    ${rows.map(({e,s})=>{
+      let next=s.next,left=-days(next);
+      return card(`
+        <h3>🐑 النعجة ${esc(e.no)}</h3>
+        <div>آخر ولادة: ${s.last} — المتوقعة: ${next}</div>
+        <div>نوع آخر مواليد: ${s.bs.length?esc(s.bs.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0].custom||s.bs.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0].type):'—'}</div>
+        <span class="pill">${left>=0?'باقي '+fmt(left)+' يوم':'متأخرة '+fmt(Math.abs(left))+' يوم'}</span>
+        ${e._reportOnly?'':btns('ewes',e)}
+      `)
+    }).join('')||'<div class="empty">لا توجد مواعيد</div>'}
+  `)
+}
+function localDay(d=new Date()){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+function periodStart(months){if(!months)return '';let d=new Date();d.setHours(0,0,0,0);let day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()-months);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return localDay(d)}
+function normalizedDate(value){let v=String(value||'').trim();if(/^\d{4}-\d{2}-\d{2}/.test(v))return v.slice(0,10);let m=v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;return ''}
+function inPeriod(r,m){if(!m)return true;let d=normalizedDate(r.date||r.regDate);return !!d&&d>=periodStart(m)&&d<=localDay()}
+function periodButtons(fn,active){return `<div class="filter">${[[1,'شهر'],[3,'3 شهور'],[6,'6 شهور'],[12,'سنة'],[0,'الكل']].map(([m,t])=>`<button type="button" class="${m===active?'primary':''}" style="${m===active?'background:#2fa052;color:white;border-color:#2fa052':''}" onclick="${fn}(${m})">${t}</button>`).join('')}</div><p class="small">${active?'الفترة: من '+periodStart(active)+' إلى '+localDay():'جميع الفترات'}</p>`}
+function allReports(months=1){let rows=t=>(db[t]||[]).filter(r=>inPeriod(r,months));let b=rows('births').map(normalizeBirth),d=rows('deaths'),sales=rows('sales'),p=rows('purchases'),e=rows('expenses'),v=rows('vaccines');let born=b.reduce((a,r)=>a+n(r.count),0),deadBaby=d.filter(r=>r.kind==='مولود').reduce((a,r)=>a+n(r.count),0),totalSales=sales.reduce((a,r)=>a+n(r.total),0),totalPurch=p.reduce((a,r)=>a+n(r.total),0),totalExp=e.reduce((a,r)=>a+n(r.total||r.amount),0);let tile=(label,val)=>`<div class="stat"><b>${fmt(val)}</b>${label}</div>`;shell('📑 تقارير الفترات',periodButtons('allReports',months)+`<div class="stats">${tile('عدد الولادات',b.length)}${tile('المواليد',born)}${tile('نفوق المواليد',deadBaby)}${tile('المواليد الأحياء بعد النفوق',Math.max(0,born-deadBaby))}${tile('إجمالي النفوق',d.reduce((a,r)=>a+n(r.count),0))}${tile('عدد عمليات البيع',sales.length)}${tile('مبيعات بالريال',totalSales)}${tile('مشتريات بالريال',totalPurch)}${tile('مصاريف بالريال',totalExp)}${tile('الربح / الخسارة بالريال',totalSales-totalPurch-totalExp)}${tile('التطعيمات',v.length)}</div>`+card('<h3>📋 العمليات في الفترة</h3>'+([['المواليد',b],['النفوق',d],['البيع',sales],['المشتريات',p],['المصاريف',e],['التطعيمات',v]].map(([name,list])=>`<p><b>${name}:</b> ${fmt(list.length)} سجل</p>`).join(''))))}
+function profit(months=0){let entries=t=>db[t].filter(r=>inPeriod(r,months)),s=entries('sales').reduce((a,b)=>a+n(b.total),0),p=entries('purchases').reduce((a,b)=>a+n(b.total),0),e=entries('expenses').reduce((a,b)=>a+n(b.total||b.amount),0);shell('📈 الربح والخسارة',periodButtons('profit',months)+`<div class="stats"><div class="stat"><b>${fmt(s)}</b>المبيعات</div><div class="stat"><b>${fmt(p)}</b>المشتريات</div><div class="stat"><b>${fmt(e)}</b>المصاريف</div><div class="stat"><b>${fmt(s-p-e)}</b>صافي النتيجة</div></div>${['sales','purchases','expenses'].flatMap(t=>entries(t).map(r=>card(`<h3>${t==='sales'?'بيع':t==='purchases'?'شراء':'مصروف'} — ${esc(r.type)}</h3><div>${r.date} — ${money(r.total||r.amount)}</div>${btns(t,r)}`))).join('')||'<div class="empty">لا توجد عمليات في هذه الفترة</div>'}`)}
+function summary(){
+  let bt=birthTotals(),
+      born=bt.count,
+      babyDead=db.deaths.filter(d=>d.kind==='مولود').reduce((a,b)=>a+n(b.count),0),
+      dead=db.deaths.reduce((a,b)=>a+n(b.count),0),
+      s=db.sales.reduce((a,b)=>a+n(b.total),0),
+      p=db.purchases.reduce((a,b)=>a+n(b.total),0),
+      e=db.expenses.reduce((a,b)=>a+n(b.amount),0),
+      lastBirth=db.births.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0],
+      lastSale=db.sales.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0],
+      lastVac=db.vaccines.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0],
+      nextVac=lastVac?addMonths(lastVac.date,lastVac.type==='دود'?3:6):'',
+      vacLeft=nextVac?-days(nextVac):null;
+
+  let vacStatus=nextVac
+    ?(vacLeft>0
+        ?`باقي ${fmt(vacLeft)} يوم`
+        :vacLeft===0
+          ?'موعد التطعيم اليوم'
+          :`متأخر ${fmt(Math.abs(vacLeft))} يوم`)
+    :'';
+
+  shell('📋 الملخص',
+    card(`
+      <h3>🐑 الحلال</h3>
+      <div>
+        عدد الحلال الحالي: ${fmt(currentHerdCount())}
+        — عدد النعاج المنتجة: ${fmt(db.ewes.length)}
+      </div>
+    `)+
+
+    card(`
+      <h3>💙 المواليد والنفوق</h3>
+      <div>
+        إجمالي المواليد: ${fmt(born)}
+        — الطليان: ${fmt(bt.males)}
+        — الرخال: ${fmt(bt.females)}
+        — نفوق المواليد: ${fmt(babyDead)}
+        — إجمالي النفوق: ${fmt(dead)}
+      </div>
+      <div>
+        آخر ولادة:
+        ${lastBirth
+          ?'رقم الأم: '+esc(lastBirth.mother)+' — '+lastBirth.date+' — '+esc(lastBirth.custom||lastBirth.type)
+          :'—'}
+      </div>
+    `)+
+
+    card(`
+      <h3>💉 التطعيمات</h3>
+      <div>
+        آخر تطعيم:
+        ${lastVac
+          ?esc(lastVac.type)+' — '+lastVac.date+
+            (nextVac?' — القادم: '+nextVac+' — '+vacStatus:'')
+          :'—'}
+      </div>
+    `)+
+
+    card(`
+      <h3>💰 المالية</h3>
+      <div>
+        إجمالي البيع: ${money(s)}
+        — المشتريات: ${money(p)}
+        — المصاريف: ${money(e)}
+        — الربح / الخسارة: ${money(s-p-e)}
+      </div>
+      <div>
+        آخر بيع:
+        ${lastSale
+          ?esc(lastSale.type)+' — '+lastSale.date+' — '+money(lastSale.total)
+          :'—'}
+      </div>
+    `)+
+
+    card(`
+      <h3>🔔 المتابعة</h3>
+      <div>
+        التنبيهات: ${fmt(alertData().length)}
+        — المتأخرة: ${fmt(alertData().filter(x=>x.type==='متأخرة').length)}
+        — قرب الولادة: ${fmt(alertData().filter(x=>x.type==='قرب الولادة').length)}
+        — التطعيمات: ${fmt(alertData().filter(x=>x.type==='تطعيم').length)}
+      </div>
+    `)
+  );
+}
+function movement(months=0){let rows=db.movements.filter(r=>{if(!months)return true;let date=String(r.date||'').slice(0,10);return date>=periodStart(months)&&date<=today()});shell('🕘 سجل الحركة',periodButtons('movement',months)+`<input class="search" placeholder="🔎 بحث" oninput="filterCards(this.value)"><div id="cards">${rows.map(r=>card(`<h3>${esc(r.type)}</h3><div>${esc(r.text)}</div><div class="small">${new Date(r.date).toLocaleString('ar-SA')}</div>${btns('movements',r)}`)).join('')||'<div class="empty">لا توجد حركات في هذه الفترة</div>'}</div>`)}function backup(){shell('💾 النسخة الاحتياطية',card(`<p>أنشئ نسخة تحفظ جميع بيانات البرنامج أو استعد نسخة سابقة.</p><div class="actions"><button class="primary" onclick="backupNow()">⬇️ إنشاء نسخة احتياطية</button><button class="secondary" onclick="$('#restoreFile').click()">⬆️ استعادة نسخة</button></div>`))}function backupNow(){let b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='aziz2027-backup-'+today()+'.json';a.click();URL.revokeObjectURL(a.href)}$('#restoreFile').onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader;r.onload=()=>{try{db=Object.assign({},blank,JSON.parse(r.result));save();alert('تمت الاستعادة')}catch{alert('الملف غير صالح')}};r.readAsText(f)}
+function buyers(){let map={};db.sales.filter(s=>s.buyer).forEach(s=>{let k=s.phone||s.buyer;if(!map[k])map[k]={buyer:s.buyer,phone:s.phone,count:0,total:0};map[k].count++;map[k].total+=n(s.total)});let arr=Object.values(map);shell('👥 سجل المشترين',`<div class="stats"><div class="stat"><b>${fmt(arr.length)}</b>عدد المشترين</div><div class="stat"><b>${fmt(db.sales.length)}</b>عمليات البيع</div><div class="stat"><b>${fmt(db.sales.reduce((a,b)=>a+n(b.total),0))}</b>إجمالي المبيعات</div></div><input class="search" placeholder="🔎 بحث بالاسم أو الجوال" oninput="filterCards(this.value)"><div id="cards">${arr.map(r=>card(`<h3>${esc(r.buyer)}</h3><div>${esc(r.phone||'')} — عمليات الشراء: ${fmt(r.count)} — الإجمالي: ${money(r.total)}</div><div class="actions"><button class="primary" onclick="wa('${esc(r.phone)}','${esc(r.buyer)}')">واتساب</button></div>`)).join('')||'<div class="empty">لا يوجد مشترون</div>'}</div>`)}function wa(phone,name){let msg=`السلام عليكم ورحمة الله وبركاته 🌹\nمتوفر لدينا حلال للبيع 🐑\nحلال طيب ومختار، واللي له رغبة بالشراء أو الاستفسار حياه الله يتواصل معنا.\nنسعد بخدمتكم وثقتكم دائمًا — حلالي`;let digits=String(phone||'').replace(/\D/g,'');if(!digits){alert('لا يوجد رقم جوال للمشتري');return}if(digits.startsWith('00966'))digits=digits.slice(2);if(digits.startsWith('05'))digits='966'+digits.slice(1);else if(digits.startsWith('5')&&digits.length===9)digits='966'+digits;else if(digits.startsWith('9660'))digits='966'+digits.slice(4);let url='https://wa.me/'+digits+'?text='+encodeURIComponent(msg);let w=window.open(url,'_blank');if(!w)window.location.href=url}
+function treatments(){shell('💊 سجل العلاجات',`<button class="primary" onclick="treatmentForm()">➕ إضافة علاج</button><input class="search" placeholder="🔎 بحث باسم العلاج" oninput="filterCards(this.value)"><div id="cards">${db.treatments.map(r=>card(`<h3>💊 ${esc(r.name)}</h3><div>الجرعة: ${esc(r.dose)} سم — الطريقة: ${esc(r.method)}</div><div>${esc(r.note||'')}</div>${btns('treatments',r)}`)).join('')||'<div class="empty">لا توجد علاجات</div>'}</div>`)}function treatmentForm(r={}){formOpen(r.id?'تعديل علاج':'إضافة علاج',`<label>اسم العلاج</label><input name="name" required value="${esc(r.name||'')}"><label>كم سم</label><input name="dose" value="${esc(r.dose||'')}"><label>طريقة الإعطاء</label><select name="method"><option>لحم</option><option ${r.method==='تحت الجلد'?'selected':''}>تحت الجلد</option></select><label>ملاحظة</label><input name="note" value="${esc(r.note||'')}">`,f=>{let o=Object.fromEntries(f);o.id=r.id||id();db.treatments=r.id?db.treatments.map(x=>x.id===r.id?o:x):[o,...db.treatments];addMove('علاج',(r.id?'تعديل ':'إضافة ')+o.name);save();treatments()})}function about(){shell('👤 نبذة عن صاحب البرنامج',card(`<div class="about" style="max-width:850px;margin:auto"><div style="font-size:38px">🇸🇦🐑</div><h2>برنامج حلالي — برنامج سعودي</h2><p>برنامج سعودي، انطلقت فكرته من أرض المملكة العربية السعودية، لخدمة مربّي الحلال وتسهيل متابعة قطعانهم وتنظيم أعمالهم.</p><p>نفخر بأن يكون «حلالي» برنامجًا سعوديًا يسهم في تطوير إدارة الحلال، ويجمع بين سهولة الاستخدام ودقة المتابعة.</p><div style="margin-top:16px"><b>صاحب فكرة البرنامج:</b> عزيز مصلح الجهني</div><div><b>الكنية:</b> أبو خالد</div><div>📱 <b>رقم الجوال:</b> <a href="tel:0564554878" style="color:var(--green2);direction:ltr;display:inline-block">0564554878</a></div><p>نسأل الله أن يجعل هذا العمل نافعًا ومباركًا للجميع.</p><p><b>حلالي — تنظيم أسهل، متابعة أدق، وبركة بإذن الله.</b></p><div class="small">الإصدار aziz2027</div></div>`))}
+function editRec(type,rid){let r=db[type].find(x=>x.id===rid);if(!r)return;({ewes:eweForm,births:birthForm,deaths:deathForm,purchases:x=>moneyForm('purchases',x),expenses:x=>moneyForm('expenses',x),sales:saleForm,vaccines:vaccineForm,inventory:inventoryForm,treatments:treatmentForm}[type]||(()=>alert('هذا السجل للعرض التلقائي')))(r)}function delRec(type,rid){if(!confirm('هل أنت متأكد من حذف هذا السجل؟'))return;if(!db[type]||!Array.isArray(db[type])){alert('تعذر الحذف');return}let before=db[type].length;db[type]=db[type].filter(x=>String(x.id)!==String(rid));if(db[type].length===before){alert('لم يتم العثور على السجل');return}localStorage.setItem(K,JSON.stringify(db));refresh();let current=$('#view h2')?.textContent||'';if(current.includes('تقرير المواليد'))birthReport();else if(current.includes('تقرير النعاج'))eweReport();else if(current.includes('إنتاج النعاج'))production();else if(current.includes('موسم الولادات'))season();else if(current.includes('الربح والخسارة'))profit();else if(current.includes('القطيع'))herd();else if(current.includes('المواليد'))births();else if(current.includes('النفوق'))deaths();else if(current.includes('المشتريات'))purchases();else if(current.includes('المصاريف'))expenses();else if(current.includes('البيع'))sales();else if(current.includes('التطعيمات'))vaccines();else if(current.includes('الجرد'))inventory();else if(current.includes('العلاجات'))treatments();else if(current.includes('الحركة'))movement();else home()}function filterCards(q){q=q.trim();document.querySelectorAll('#cards .card').forEach(c=>c.style.display=c.textContent.includes(q)?'block':'none')}document.addEventListener('click',function(e){let b=e.target.closest('.js-delete,.js-edit');if(!b)return;e.preventDefault();e.stopPropagation();let type=b.dataset.type,rid=b.dataset.id;if(b.classList.contains('js-delete'))delRec(type,rid);else editRec(type,rid)});function toggleTheme(){document.body.classList.toggle('light');localStorage.setItem('aziz2027-theme',document.body.classList.contains('light')?'light':'dark')}if(localStorage.getItem('aziz2027-theme')==='light')document.body.classList.add('light');ensureIds();refresh();
+</script><script>
+if ('serviceWorker' in navigator) {
+  /* معاينة مستقلة: بدون تسجيل عامل التخزين */
+}
+</script><!-- المعاينة المحلية فقط: التفعيل السنوي سيُختبر مع الخادم قبل النشر -->
+<script>
+/* اختبار منفصل: لا يغيّر تفعيل النسخة الأصلية */
+(function(){
+const A='halali_test_activation_v1',E='halali_test_expiry_v1',D='halali_test_device_v1';
+const URL='https://zvdxvvkvdlfbsdhxfvtq.supabase.co/functions/v1/smooth-processor';
+let device=localStorage.getItem(D);
+if(!device){device='AKD-'+(Date.now().toString(36)+Math.random().toString(36).slice(2)).toUpperCase();localStorage.setItem(D,device)}
+const valid=()=>localStorage.getItem(A)==='1'&&Number(localStorage.getItem(E))>Date.now();
+const gate=document.createElement('div');gate.id='testActivationGate';gate.style.cssText='position:fixed;inset:0;z-index:999999;background:#07140f;color:#fff;display:none;align-items:center;justify-content:center;padding:18px;font-family:Tahoma,Arial;direction:rtl';
+gate.innerHTML='<div style="width:min(460px,100%);background:#10271b;border:1px solid #316c4c;border-radius:20px;padding:24px"><h2>🐑 تفعيل حلالي — اختبار</h2><p>اشتراك تجريبي لمدة 365 يومًا يبدأ من أول تفعيل.</p><p>رقم الجهاز</p><input id="testDevice" readonly style="width:100%;padding:12px;direction:ltr"/><button id="testCopy" style="width:100%;padding:12px;margin-top:8px">نسخ رقم الجهاز</button><p>كود التفعيل</p><input id="testCode" style="width:100%;padding:12px;direction:ltr"/><button id="testActivate" style="width:100%;padding:13px;margin-top:10px;background:#2fa052;color:white;border:0;border-radius:8px">تفعيل 365 يوم</button><p id="testMessage"></p></div>';
+document.body.appendChild(gate);document.getElementById('testDevice').value=device;
+const label=document.createElement('div');label.style.cssText='position:fixed;bottom:10px;left:10px;z-index:999998;background:#0d2118;color:#58d68d;border:1px solid #28543e;padding:8px 12px;border-radius:10px;font:700 14px Tahoma,Arial';document.body.appendChild(label);
+function update(){if(!valid()){gate.style.display='flex';label.style.display='none'}else{gate.style.display='none';label.style.display='block';label.textContent='الاشتراك التجريبي: باقي '+Math.ceil((Number(localStorage.getItem(E))-Date.now())/86400000)+' يوم'}}
+document.getElementById('testCopy').onclick=async()=>{try{await navigator.clipboard.writeText(device);document.getElementById('testMessage').textContent='تم نسخ رقم الجهاز'}catch{document.getElementById('testMessage').textContent='انسخ الرقم يدويًا'}};
+document.getElementById('testActivate').onclick=async()=>{const b=document.getElementById('testActivate'),m=document.getElementById('testMessage'),code=document.getElementById('testCode').value.trim().toUpperCase();if(!code){m.textContent='أدخل كود التفعيل';return}b.disabled=true;m.textContent='جاري التحقق...';try{const r=await fetch(URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device,code})});const data=await r.json();if(r.ok&&data.ok===true){localStorage.setItem(A,'1');localStorage.setItem(E,String(Date.now()+365*86400000));update()}else{m.textContent='كود التفعيل غير صحيح'}}catch(e){m.textContent='تعذر الاتصال بالخادم. افتح النسخة عبر موقع HTTPS وتأكد من الإنترنت'}finally{b.disabled=false}};
+update();setInterval(update,60000);
+})();
+</script>
+</body></html>

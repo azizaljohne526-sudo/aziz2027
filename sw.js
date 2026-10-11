@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aziz2027-offline-v24';
+const CACHE_NAME = 'aziz2027-offline-v25';
 
 const FILES_TO_CACHE = [
   './index.html',

@@ -1,7 +1,7 @@
 const CACHE_NAME = 'aziz2027-offline-v24';
 
 const FILES_TO_CACHE = [
-  './aziz2027.html',
+  './index.html',
   './code-generator.html',
   './activation.js'
 ];

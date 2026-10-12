@@ -273,112 +273,155 @@ function vaccines(){
 }
 function eweStats(e){let no=String(e.no||e.mother||''),bs=db.births.filter(b=>String(b.mother)===no).map(normalizeBirth),born=bs.reduce((a,b)=>a+n(b.count),0),dead=db.deaths.filter(d=>d.kind==='مولود'&&String(d.mother)===no).reduce((a,b)=>a+n(b.count),0),lastBirth=bs.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]?.date||e.lastBirth||'';return{bs,born,dead,live:Math.max(0,born-dead),last:lastBirth,next:lastBirth?addMonths(lastBirth,6):''}}
 function reportMothers(){let map=new Map();db.ewes.forEach(e=>map.set(String(e.no),e));db.births.forEach(b=>{let k=String(b.mother||'');if(k&&!map.has(k))map.set(k,{id:'report-'+k,no:k,status:'—',regDate:'',lastBirth:b.date,_reportOnly:true})});return [...map.values()]}
+
 function eweReport(){
-  let rows=reportMothers();
-
   shell('📋 تقرير النعاج',`
-    <div class="actions">
-  <input id="eweSearch" class="search" placeholder="🔎 بحث برقم النعجة" oninput="filterCards(this.value)">
-  <button class="primary" type="button" onclick="filterCards(document.getElementById('eweSearch').value)">بحث</button>
-</div>
-    <div id="cards">
-      ${rows.map(e=>{
-        let s=eweStats(e);
-
-        let births=s.bs.map(normalizeBirth);
-
-        let males=births.reduce((a,b)=>a+n(b.males),0);
-        let females=births.reduce((a,b)=>a+n(b.females),0);
-
-        let deaths=db.deaths.filter(d=>
-          d.kind==='مولود' &&
-          String(d.mother)===String(e.no)
-        );
-
-        let deadM=deaths.reduce((a,d)=>{
-          if(d.childType==='طلي'||d.childType==='طليان')
-            return a+n(d.count);
-          if(d.childType==='طلي ورخلة')
-            return a+1;
-          return a;
-        },0);
-
-        let deadF=deaths.reduce((a,d)=>{
-          if(d.childType==='رخلة'||d.childType==='رخلتين')
-            return a+n(d.count);
-          if(d.childType==='طلي ورخلة')
-            return a+1;
-          return a;
-        },0);
-
-        let liveM=Math.max(0,males-deadM);
-        let liveF=Math.max(0,females-deadF);
-        let live=liveM+liveF;
-
-        let deathText=deaths.length
-          ?deaths.map(d=>{
-              let type=d.childType==='أخرى'
-                ?(d.childOther||'أخرى')
-                :(d.childType||'—');
-              return `${esc(type)} ${fmt(d.count||1)}`;
-            }).join(' | ')
-          :'لا يوجد';
-
-        let history=births
-          .slice()
-          .sort((a,b)=>String(a.date).localeCompare(String(b.date)))
-          .map((b,i)=>{
-            let what=b.type==='أخرى'
-              ?(b.custom||`${n(b.males)} طليان و ${n(b.females)} رخال`)
-              :(b.type||'—');
-
-            return `
-              <div style="margin-top:8px;padding:8px;border-top:1px solid var(--line)">
-                <b>الولادة ${fmt(i+1)}</b><br>
-                التاريخ: ${esc(b.date||'—')}<br>
-                جابت: ${esc(what)}
-              </div>
-            `;
-          }).join('');
-
-        return card(`
-          <h3>🐑 النعجة رقم ${esc(e.no)}</h3>
-
-          <div>
-            ${e.regDate?'العمر: '+eweAgeText(e)+' — ':''}
-            الحالة: ${esc(e.status||'—')}
-          </div>
-
-          <div>
-            الولادات: ${fmt(births.length)}
-            — إجمالي المواليد: ${fmt(males+females)}
-            — نفوق: ${fmt(deadM+deadF)}
-            — المواليد الحية: ${fmt(live)}
-          </div>
-
-          <div>
-            <b>الحي:</b>
-            طليان ${fmt(liveM)} — رخال ${fmt(liveF)}
-          </div>
-
-          <div>
-            <b>النفوق:</b> ${deathText}
-          </div>
-
-          <div>
-            آخر ولادة: ${s.last||'—'}
-            — القادمة: ${s.next||'—'}
-            ${s.next?'— باقي '+fmt(-days(s.next))+' يوم':''}
-          </div>
-
-          ${history}
-
-          ${e._reportOnly?'':btns('ewes',e)}
-        `);
-      }).join('')||'<div class="empty">لا توجد بيانات</div>'}
+    <div class="card" style="margin-bottom:14px">
+      <h3>🐑 تقرير النعجة</h3>
+      <label>رقم النعجة</label>
+      <div class="actions">
+        <input id="eweSearch" type="text"
+          inputmode="numeric"
+          placeholder="اكتب رقم النعجة"
+          style="flex:1;min-width:180px">
+        <button id="eweSearchBtn" class="primary"
+          type="button">🔎 بحث</button>
+      </div>
+    </div>
+    <div id="eweResult">
+      <div class="empty">اكتب رقم النعجة واضغط بحث لعرض تقريرها</div>
     </div>
   `);
+
+  const input=$('#eweSearch');
+  const result=$('#eweResult');
+
+  function searchEwe(){
+    const no=input.value.trim();
+
+    if(!no){
+      result.innerHTML='<div class="empty">اكتب رقم النعجة أولاً</div>';
+      return;
+    }
+
+    const e=reportMothers().find(
+      x=>String(x.no)===no
+    );
+
+    if(!e){
+      result.innerHTML='<div class="empty">لا توجد نعجة بهذا الرقم</div>';
+      return;
+    }
+
+    const s=eweStats(e);
+    const births=s.bs.map(normalizeBirth);
+    const males=births.reduce((a,b)=>a+n(b.males),0);
+    const females=births.reduce((a,b)=>a+n(b.females),0);
+
+    const deaths=db.deaths.filter(d=>
+      d.kind==='مولود' && String(d.mother)===no
+    );
+
+    const deadM=deaths.reduce((a,d)=>{
+      if(['طلي','طليان'].includes(d.childType))
+        return a+n(d.count);
+      if(d.childType==='طلي ورخلة')
+        return a+1;
+      return a;
+    },0);
+
+    const deadF=deaths.reduce((a,d)=>{
+      if(['رخلة','رخلتين'].includes(d.childType))
+        return a+n(d.count);
+      if(d.childType==='طلي ورخلة')
+        return a+1;
+      return a;
+    },0);
+
+    const liveM=Math.max(0,males-deadM);
+    const liveF=Math.max(0,females-deadF);
+    const left=s.next?-days(s.next):null;
+
+    const history=births.slice()
+      .sort((a,b)=>String(a.date).localeCompare(String(b.date)))
+      .map((b,i)=>{
+        const what=b.type==='أخرى'
+          ?(b.custom||`${n(b.males)} طليان و ${n(b.females)} رخال`)
+          :(b.type||'—');
+
+        return `
+          <div style="padding:12px 0;border-top:1px solid var(--line)">
+            <b>الولادة ${fmt(i+1)}</b>
+            <div>التاريخ: ${esc(b.date||'—')}</div>
+            <div>جابت: ${esc(what)}</div>
+            <div>العدد: ${fmt(b.count)}</div>
+          </div>`;
+      }).join('')||'<p class="small">لا يوجد سجل ولادات</p>';
+
+    const vaccineRows=db.vaccines.filter(v=>
+      String(v.animalNo||'')===no ||
+      (!v.animalNo && ['النعاج','نعجة','الحلال كله'].includes(v.group))
+    ).map(v=>`
+      <div style="padding:8px 0;border-top:1px solid var(--line)">
+        ${esc(v.type)} — ${esc(v.date||'—')}
+        ${v.note?' — '+esc(v.note):''}
+      </div>
+    `).join('')||'<p class="small">لا توجد تطعيمات مسجلة لهذه النعجة</p>';
+
+    const noteRows=(db.notes||[]).filter(v=>
+      String(v.animalNo||v.no||v.mother||'')===no
+    ).map(v=>`
+      <div style="padding:8px 0;border-top:1px solid var(--line)">
+        ${esc(v.date||'—')} — ${esc(v.text||v.note||v.type||'ملاحظة')}
+      </div>
+    `).join('')||'<p class="small">لا توجد ملاحظات مسجلة برقم هذه النعجة</p>';
+
+    const nextText=!s.next?'غير محدد':
+      left>0?'باقي '+fmt(left)+' يوم':
+      left===0?'موعد الولادة المتوقع اليوم':
+      'متأخرة '+fmt(Math.abs(left))+' يوم';
+
+    result.innerHTML=card(`
+      <h3>🐑 النعجة رقم ${esc(e.no)}</h3>
+
+      <div class="stats">
+        <div class="stat"><b>${fmt(births.length)}</b>عدد الولادات</div>
+        <div class="stat"><b>${fmt(males+females)}</b>إجمالي المواليد</div>
+        <div class="stat"><b>${fmt(liveM+liveF)}</b>المواليد الحية</div>
+        <div class="stat"><b>${fmt(deadM+deadF)}</b>النفوق</div>
+      </div>
+
+      <div style="line-height:2">
+        <div>العمر: ${e.regDate?eweAgeText(e):'غير محدد'}</div>
+        <div>الحالة: ${esc(e.status||'—')}</div>
+        <div>الطليان الحية: ${fmt(liveM)} — الرخال الحية: ${fmt(liveF)}</div>
+        <div>آخر ولادة: ${esc(s.last||'—')}</div>
+        <div>الولادة القادمة المتوقعة: ${esc(s.next||'—')}</div>
+        <div style="color:var(--green2);font-weight:bold">${nextText}</div>
+      </div>
+
+      <h3 style="margin-top:20px">📅 سجل الولادات</h3>
+      ${history}
+
+      <h3 style="margin-top:20px">💉 التطعيمات</h3>
+      ${vaccineRows}
+
+      <h3 style="margin-top:20px">📝 الملاحظات</h3>
+      ${noteRows}
+
+      ${e._reportOnly?'':btns('ewes',e)}
+    `);
+  }
+
+  $('#eweSearchBtn').onclick=searchEwe;
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){
+      e.preventDefault();
+      searchEwe();
+    }
+  });
 }
+
 function inventory(){let system=currentHerdCount();shell('📦 جرد الحلال',`<button class="primary" onclick="inventoryForm()">➕ جرد جديد</button><p class="small">الجرد للمقارنة فقط ولا يغيّر عدد الحلال. عدد الحلال بالنظام الآن: <b>${fmt(system)}</b></p>${db.inventory.map(r=>{let total=n(r.ewes)+n(r.rams)+n(r.lambs)+n(r.females),diff=total-system,msg=diff>0?'🟢 زيادة '+fmt(diff):diff<0?'🔴 نقص '+fmt(Math.abs(diff)):'✅ مطابق';return card(`<h3>📦 جرد ${fmt(total)} رأس</h3><div>نعاج ${fmt(r.ewes)} — فحول ${fmt(r.rams)} — طليان ${fmt(r.lambs)} — رخال ${fmt(r.females)}</div><div>عدد الحلال بالنظام: ${fmt(system)} — <b>${msg}</b></div><div>${r.date}</div>${btns('inventory',r)}`)}).join('')||'<div class="empty">لا يوجد جرد</div>'}`)}function inventoryForm(r={}){formOpen(r.id?'تعديل الجرد':'جرد جديد',`<label>عدد النعاج</label><input type="number" name="ewes" value="${r.ewes||0}"><label>عدد الفحول</label><input type="number" name="rams" value="${r.rams||0}"><label>عدد الطليان</label><input type="number" name="lambs" value="${r.lambs||0}"><label>عدد الرخال</label><input type="number" name="females" value="${r.females||0}"><label>تاريخ الجرد</label><input type="date" name="date" value="${r.date||today()}"><label>ملاحظة</label><input name="note" value="${esc(r.note||'')}">`,f=>{let o=Object.fromEntries(f);o.id=r.id||id();db.inventory=r.id?db.inventory.map(x=>x.id===r.id?o:x):[o,...db.inventory];addMove('جرد',(r.id?'تعديل':'إضافة')+' جرد');save();inventory()})}
 function birthReport(months=0){shell('📊 تقرير المواليد',periodButtons('birthReport',months)+reportBirthBody(months))}function production(months=0){let rows=reportMothers();shell('🏆 إنتاج النعاج',periodButtons('production',months)+rows.map(e=>{let s=eweStats(e),bs=s.bs.filter(b=>inPeriod(b,months));if(months&&!bs.length)return '';let born=bs.reduce((a,b)=>a+n(normalizeBirth(b).count),0),dead=db.deaths.filter(d=>d.kind==='مولود'&&String(d.mother)===String(e.no)&&inPeriod(d,months)).reduce((a,b)=>a+n(b.count),0),types=bs.map(b=>esc(b.custom||b.type)).filter(Boolean).join(' | ');return card(`<h3>🏆 النعجة ${esc(e.no)}</h3><div>الولادات: ${fmt(bs.length)} — إجمالي المواليد: ${fmt(born)} — النفوق: ${fmt(dead)} — الحية: ${fmt(Math.max(0,born-dead))}</div><div>نوع المواليد: ${types||'—'}</div>${e._reportOnly?'':btns('ewes',e)}`)}).join('')||'<div class="empty">لا توجد بيانات</div>')}
 function reportBirthBody(months=0){

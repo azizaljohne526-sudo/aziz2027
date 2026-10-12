@@ -277,7 +277,10 @@ function eweReport(){
   let rows=reportMothers();
 
   shell('📋 تقرير النعاج',`
-    <input class="search" placeholder="🔎 بحث برقم النعجة" oninput="filterCards(this.value)">
+    <div class="actions">
+  <input id="eweSearch" class="search" placeholder="🔎 بحث برقم النعجة" oninput="filterCards(this.value)">
+  <button class="primary" type="button" onclick="filterCards(document.getElementById('eweSearch').value)">بحث</button>
+</div>
     <div id="cards">
       ${rows.map(e=>{
         let s=eweStats(e);

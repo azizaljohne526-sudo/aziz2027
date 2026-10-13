@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'aziz2027-offline-v30';
+const CACHE_NAME = 'aziz2027-offline-v31';
 
 const FILES_TO_CACHE = [
   './',
